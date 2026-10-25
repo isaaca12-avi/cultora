@@ -57,6 +57,11 @@ export const auth = {
   register: (data) => http.post("/auth/register", data).then((r) => r.data),
   login: (data) => http.post("/auth/login", data).then((r) => r.data),
   me: () => http.get("/auth/me").then((r) => r.data),
+  forgotPassword: (email) => http.post("/auth/forgot-password", { email }).then((r) => r.data),
+  resetPassword: (token, new_password) =>
+    http.post("/auth/reset-password", { token, new_password }).then((r) => r.data),
+  verifyEmail: (token) => http.post("/auth/verify-email", { token }).then((r) => r.data),
+  resendVerification: () => http.post("/auth/resend-verification").then((r) => r.data),
 };
 
 export const profile = {
@@ -81,6 +86,7 @@ export const plans = {
   get: (id) => http.get(`/plans/${id}`).then((r) => r.data),
   updateItem: (planId, itemId, payload) =>
     http.put(`/plans/${planId}/items/${itemId}`, payload).then((r) => r.data),
+  feedback: (planId, payload) => http.post(`/plans/${planId}/feedback`, payload).then((r) => r.data),
 };
 
 export const knowledge = {

@@ -6,8 +6,12 @@ import { Toaster } from "@/components/ui/sonner";
 
 import AppLayout from "@/components/AppLayout";
 import Landing from "@/pages/Landing";
+import Vision from "@/pages/Vision";
 import LoginPage from "@/pages/Login";
 import RegisterPage from "@/pages/Register";
+import RecuperarPassword from "@/pages/RecuperarPassword";
+import RestablecerPassword from "@/pages/RestablecerPassword";
+import VerifyEmail from "@/pages/VerifyEmail";
 import Dashboard from "@/pages/Dashboard";
 import GoalsPage from "@/pages/Goals";
 import Diagnostic from "@/pages/Diagnostic";
@@ -76,6 +80,7 @@ export default function App() {
         <BrowserRouter>
           <Routes>
             <Route path="/" element={<Landing />} />
+            <Route path="/vision" element={<Vision />} />
             <Route path="/apoyar" element={<Support />} />
             <Route path="/convocatorias" element={<AppLayout />}>
               <Route index element={<Convocatorias />} />
@@ -85,6 +90,9 @@ export default function App() {
             </Route>
             <Route path="/login" element={<PublicOnly><LoginPage /></PublicOnly>} />
             <Route path="/registro" element={<PublicOnly><RegisterPage /></PublicOnly>} />
+            <Route path="/recuperar-password" element={<RecuperarPassword />} />
+            <Route path="/restablecer-password" element={<RestablecerPassword />} />
+            <Route path="/verificar-email" element={<VerifyEmail />} />
             <Route path="/cambiar-password-inicial" element={<InitialPasswordChange />} />
 
             <Route element={<Protected><AppLayout /></Protected>}>

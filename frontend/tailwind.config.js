@@ -8,14 +8,35 @@ module.exports = {
     theme: {
         extend: {
             fontFamily: {
-                sans: ["Manrope", "system-ui", "sans-serif"],
-                serif: ["Cormorant Garamond", "Georgia", "serif"],
+                sans: ["Inter", "system-ui", "sans-serif"],
+                display: ["Plus Jakarta Sans", "system-ui", "sans-serif"],
+                serif: ["Plus Jakarta Sans", "system-ui", "sans-serif"],
                 mono: ["IBM Plex Mono", "monospace"],
             },
             borderRadius: {
                 lg: 'var(--radius)',
                 md: 'calc(var(--radius) - 2px)',
-                sm: 'calc(var(--radius) - 4px)'
+                sm: 'calc(var(--radius) - 4px)',
+                card: '16px',
+                control: '10px',
+            },
+            boxShadow: {
+                card: '0 1px 2px rgba(15,15,15,0.03), 0 8px 24px -12px rgba(15,15,15,0.10)',
+                lift: '0 2px 4px rgba(15,15,15,0.04), 0 16px 32px -16px rgba(15,15,15,0.16)',
+            },
+            opacity: {
+                3: '0.03',
+                6: '0.06',
+                8: '0.08',
+                12: '0.12',
+                14: '0.14',
+                18: '0.18',
+                22: '0.22',
+                35: '0.35',
+                45: '0.45',
+                55: '0.55',
+                65: '0.65',
+                85: '0.85',
             },
             colors: {
                 alabaster: "#F9F8F6",
@@ -23,6 +44,8 @@ module.exports = {
                 terracotta: "#B64626",
                 olive: "#3A4533",
                 linen: "#EAE7E0",
+                surface: "#FFFFFF",
+                "surface-muted": "#FBFAF8",
                 background: 'hsl(var(--background))',
                 foreground: 'hsl(var(--foreground))',
                 card: { DEFAULT: 'hsl(var(--card))', foreground: 'hsl(var(--card-foreground))' },

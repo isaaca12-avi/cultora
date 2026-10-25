@@ -6,6 +6,9 @@ import os
 import uuid
 import json
 import re
+import asyncio
+import hashlib
+import secrets
 import logging
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
@@ -36,6 +39,7 @@ from admin_router import build_admin_router
 from admin_seed import run_admin_seed
 from admin_bootstrap import run_admin_bootstrap, BootstrapConfigError
 from rag import search as kb_search, format_context_block
+from email_service import send_email
 from security_lib import (
     validate_jwt_secret_or_die,
     admin_password_policy,
@@ -64,6 +68,13 @@ JWT_EXPIRE_HOURS = int(os.environ.get("JWT_EXPIRE_HOURS", "24"))
 EMERGENT_LLM_KEY = os.environ.get("EMERGENT_LLM_KEY", "")
 LLM_MODEL = "gpt-5.2"
 LLM_PROVIDER = "openai"
+FRONTEND_URL = os.environ.get("FRONTEND_URL", "http://localhost:3000").strip().rstrip("/")
+AUTH_TOKEN_TTL_MINUTES = int(os.environ.get("AUTH_TOKEN_TTL_MINUTES", "60"))
+EMAIL_VERIFICATION_TTL_HOURS = int(os.environ.get("EMAIL_VERIFICATION_TTL_HOURS", "48"))
+EXPOSE_AUTH_LINKS = (
+    os.environ.get("CULTORA_EXPOSE_AUTH_LINKS", "").strip().lower() in {"1", "true", "yes", "on"}
+    and CULTORA_ENV not in {"production", "prod"}
+)
 
 # Aborta el arranque si el secreto es débil en entornos production/staging.
 validate_jwt_secret_or_die(JWT_SECRET, CULTORA_ENV)
@@ -97,6 +108,7 @@ class UserPublic(BaseModel):
     name: str
     created_at: str
     profile_complete: bool = False
+    email_verified: bool = True
     admin_role: Optional[str] = None
     is_admin: bool = False
     must_change_password: bool = False
@@ -116,6 +128,7 @@ class LoginIn(BaseModel):
 class TokenOut(BaseModel):
     token: str
     user: UserPublic
+    dev_verify_link: Optional[str] = None
 
 
 class Profile(BaseModel):
@@ -144,6 +157,25 @@ class DiagnosticAnswerIn(BaseModel):
 class UpdateItemIn(BaseModel):
     status: Optional[Literal["pending", "in_progress", "done"]] = None
     note: Optional[str] = None
+
+
+class PlanFeedbackIn(BaseModel):
+    rating: Literal["up", "down"]
+    comment: Optional[str] = Field(default=None, max_length=2000)
+    item_id: Optional[str] = None
+
+
+class ForgotPasswordIn(BaseModel):
+    email: EmailStr
+
+
+class ResetPasswordIn(BaseModel):
+    token: str = Field(min_length=10)
+    new_password: str = Field(min_length=10, max_length=200)
+
+
+class VerifyEmailIn(BaseModel):
+    token: str = Field(min_length=10)
 
 
 # --------------------------------------------------------------------
@@ -228,6 +260,7 @@ def user_to_public(u: Dict[str, Any]) -> UserPublic:
         name=u["name"],
         created_at=u["created_at"],
         profile_complete=complete,
+        email_verified=bool(u.get("email_verified", True)),
         admin_role=role,
         is_admin=bool(role),
         must_change_password=bool(u.get("must_change_password")),
@@ -313,6 +346,109 @@ def _check_rate_limit(request: Request, prefix: str, *, max_events: int, window:
         )
 
 
+def _hash_token(raw: str) -> str:
+    return hashlib.sha256(raw.encode()).hexdigest()
+
+
+async def _create_one_time_token(collection: str, user_id: str, *, ttl_minutes: int) -> str:
+    raw = secrets.token_urlsafe(32)
+    expires_at = datetime.now(timezone.utc) + timedelta(minutes=ttl_minutes)
+    await db[collection].insert_one({
+        "id": new_id(),
+        "user_id": user_id,
+        "token_hash": _hash_token(raw),
+        "created_at": now_iso(),
+        "expires_at": expires_at.isoformat(),
+        "expires_at_dt": expires_at,
+        "used_at": None,
+    })
+    return raw
+
+
+async def _consume_one_time_token(collection: str, raw: str) -> Optional[Dict[str, Any]]:
+    if not raw:
+        return None
+    doc = await db[collection].find_one({"token_hash": _hash_token(raw), "used_at": None})
+    if not doc:
+        return None
+    expires = doc.get("expires_at_dt")
+    if expires is None:
+        try:
+            expires = datetime.fromisoformat(doc["expires_at"])
+        except (KeyError, ValueError):
+            return None
+    if expires.tzinfo is None:
+        expires = expires.replace(tzinfo=timezone.utc)
+    if expires < datetime.now(timezone.utc):
+        return None
+    result = await db[collection].update_one(
+        {"id": doc["id"], "used_at": None},
+        {"$set": {"used_at": now_iso()}},
+    )
+    if result.modified_count != 1:
+        return None
+    return doc
+
+
+async def _send_auth_email(to: str, subject: str, text: str, html: str) -> bool:
+    try:
+        return await asyncio.to_thread(send_email, to, subject, text, html)
+    except Exception as exc:  # noqa: BLE001 - nunca bloquear el flujo por el correo
+        logger.warning("Envío de correo falló para %s: %s", to, exc)
+        return False
+
+
+def _auth_email_layout(title: str, body: str, cta_url: str, cta_label: str) -> str:
+    return f"""<!doctype html>
+<html lang="es">
+  <body style="margin:0;background:#F9F8F6;font-family:Inter,Arial,sans-serif;color:#0F0F0F;">
+    <div style="max-width:520px;margin:0 auto;padding:32px 20px;">
+      <div style="font-size:18px;font-weight:700;letter-spacing:-0.02em;margin-bottom:28px;">Cultora</div>
+      <div style="background:#FFFFFF;border:1px solid rgba(15,15,15,0.08);border-radius:16px;padding:32px;">
+        <h1 style="margin:0 0 12px;font-size:22px;line-height:1.25;letter-spacing:-0.02em;">{title}</h1>
+        <p style="margin:0 0 24px;font-size:14px;line-height:1.65;color:rgba(15,15,15,0.62);">{body}</p>
+        <a href="{cta_url}" style="display:inline-block;background:#0F0F0F;color:#F9F8F6;text-decoration:none;font-size:14px;font-weight:600;padding:12px 20px;border-radius:10px;">{cta_label}</a>
+        <p style="margin:24px 0 0;font-size:12px;line-height:1.6;color:rgba(15,15,15,0.42);">
+          Si el botón no funciona, copia este enlace en tu navegador:<br />
+          <span style="word-break:break-all;color:#B64626;">{cta_url}</span>
+        </p>
+      </div>
+      <p style="margin:18px 0 0;font-size:11px;line-height:1.6;color:rgba(15,15,15,0.42);">
+        Si no solicitaste este mensaje, puedes ignorarlo. Nadie podrá acceder a tu cuenta con este correo.
+      </p>
+    </div>
+  </body>
+</html>"""
+
+
+async def _issue_email_verification(user: Dict[str, Any]) -> Dict[str, Any]:
+    # Un solo enlace válido a la vez: el reenvío invalida los anteriores.
+    await db.email_verification_tokens.update_many(
+        {"user_id": user["id"], "used_at": None},
+        {"$set": {"used_at": now_iso()}},
+    )
+    raw = await _create_one_time_token(
+        "email_verification_tokens",
+        user["id"],
+        ttl_minutes=EMAIL_VERIFICATION_TTL_HOURS * 60,
+    )
+    link = f"{FRONTEND_URL}/verificar-email?token={raw}"
+    text = (
+        "Confirma tu correo para activar las notificaciones de Cultora.\n\n"
+        f"Abre este enlace: {link}\n\n"
+        f"El enlace vence en {EMAIL_VERIFICATION_TTL_HOURS} horas."
+    )
+    html = _auth_email_layout(
+        "Confirma tu correo",
+        "Estás a un clic de completar tu cuenta. Confirma tu correo para recibir avisos de tu plan, "
+        "recomendaciones y novedades de Cultora.",
+        link,
+        "Confirmar mi correo",
+    )
+    sent = await _send_auth_email(user["email"], "Confirma tu correo · Cultora", text, html)
+    return {"email_sent": sent, "link": link}
+
+
 # --------------------------------------------------------------------
 # Auth routes
 # --------------------------------------------------------------------
@@ -336,12 +472,21 @@ async def register(body: RegisterIn, request: Request):
         "profile": {},
         "session_version": INITIAL_SESSION_VERSION,
         "status": "active",
+        "email_verified": False,
     }
     await db.users.insert_one(user_doc)
-    await _audit("auth.register", request=request, actor=user_doc, target_id=user_doc["id"])
+    verify = await _issue_email_verification(user_doc)
+    await _audit(
+        "auth.register",
+        request=request,
+        actor=user_doc,
+        target_id=user_doc["id"],
+        meta={"email_sent": verify["email_sent"]},
+    )
     return TokenOut(
         token=make_token(user_doc["id"], INITIAL_SESSION_VERSION),
         user=user_to_public(user_doc),
+        dev_verify_link=verify["link"] if EXPOSE_AUTH_LINKS else None,
     )
 
 
@@ -438,6 +583,148 @@ async def change_initial_password(body: ChangeInitialPasswordIn, request: Reques
     new_token = make_token(user["id"], new_sv)
     await _audit("password.initial_changed", request=request, actor=user, target_id=user["id"])
     return {"ok": True, "changed_at": now_iso(), "token": new_token}
+
+
+@api.post("/auth/forgot-password")
+async def forgot_password(body: ForgotPasswordIn, request: Request):
+    email = body.email.lower()
+    _check_rate_limit(request, "forgot", max_events=5, window=900, extra_key=email)
+    generic = {
+        "ok": True,
+        "message": "Si el correo está registrado, te enviamos un enlace para restablecer tu contraseña.",
+    }
+    u = await db.users.find_one({"email": email})
+    if not u or u.get("status") in {"deleted"}:
+        await _audit(
+            "auth.forgot_password",
+            request=request,
+            result="no_user",
+            meta={"attempted_email": email},
+        )
+        return generic
+
+    raw = await _create_one_time_token(
+        "password_reset_tokens",
+        u["id"],
+        ttl_minutes=AUTH_TOKEN_TTL_MINUTES,
+    )
+    link = f"{FRONTEND_URL}/restablecer-password?token={raw}"
+    text = (
+        "Recibimos una solicitud para restablecer tu contraseña de Cultora.\n\n"
+        f"Abre este enlace para crear una nueva: {link}\n\n"
+        f"El enlace vence en {AUTH_TOKEN_TTL_MINUTES} minutos y sólo puede usarse una vez.\n"
+        "Si no fuiste tú, ignora este correo: tu contraseña actual sigue siendo válida."
+    )
+    html = _auth_email_layout(
+        "Restablece tu contraseña",
+        "Recibimos una solicitud para restablecer la contraseña de tu cuenta. "
+        "Crea una nueva desde el botón de abajo. El enlace vence pronto y sólo puede usarse una vez.",
+        link,
+        "Crear nueva contraseña",
+    )
+    sent = await _send_auth_email(u["email"], "Restablece tu contraseña · Cultora", text, html)
+    await _audit(
+        "auth.forgot_password",
+        request=request,
+        actor=u,
+        target_id=u["id"],
+        meta={"email_sent": sent},
+    )
+    if EXPOSE_AUTH_LINKS:
+        generic["dev_link"] = link
+    return generic
+
+
+@api.post("/auth/reset-password")
+async def reset_password(body: ResetPasswordIn, request: Request):
+    _check_rate_limit(request, "reset", max_events=10, window=3600)
+    token_doc = await _consume_one_time_token("password_reset_tokens", body.token)
+    if not token_doc:
+        raise HTTPException(
+            status_code=400,
+            detail={"code": "invalid_token", "message": "El enlace no es válido o ya expiró. Solicita uno nuevo."},
+        )
+    u = await db.users.find_one({"id": token_doc["user_id"]})
+    if not u:
+        raise HTTPException(
+            status_code=400,
+            detail={"code": "invalid_token", "message": "El enlace no es válido o ya expiró. Solicita uno nuevo."},
+        )
+    if u.get("status") in {"deleted"}:
+        raise HTTPException(status_code=400, detail="No pudimos restablecer esta cuenta")
+    try:
+        if u.get("admin_role"):
+            admin_password_policy(body.new_password)
+        else:
+            user_password_policy(body.new_password)
+    except PasswordPolicyError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    if u.get("password_hash") and verify_password(body.new_password, u["password_hash"]):
+        raise HTTPException(status_code=400, detail="La nueva contraseña debe ser distinta de la anterior")
+
+    new_sv = int(u.get("session_version") or INITIAL_SESSION_VERSION) + 1
+    await db.users.update_one(
+        {"id": u["id"]},
+        {
+            "$set": {
+                "password_hash": hash_password(body.new_password),
+                "password_changed_at": now_iso(),
+                "session_version": new_sv,
+                "must_change_password": False,
+            }
+        },
+    )
+    # El token ya quedó marcado como usado; invalidar cualquier otro pendiente.
+    await db.password_reset_tokens.update_many(
+        {"user_id": u["id"], "used_at": None},
+        {"$set": {"used_at": now_iso()}},
+    )
+    await _audit("auth.password_reset", request=request, actor=u, target_id=u["id"])
+    return {"ok": True, "message": "Contraseña actualizada. Inicia sesión con tu nueva contraseña."}
+
+
+@api.post("/auth/verify-email")
+async def verify_email(body: VerifyEmailIn, request: Request):
+    _check_rate_limit(request, "verify-email", max_events=10, window=900)
+    token_doc = await _consume_one_time_token("email_verification_tokens", body.token)
+    if not token_doc:
+        raise HTTPException(
+            status_code=400,
+            detail={"code": "invalid_token", "message": "El enlace de verificación no es válido o ya expiró."},
+        )
+    u = await db.users.find_one({"id": token_doc["user_id"]})
+    if not u:
+        raise HTTPException(status_code=400, detail="No pudimos verificar esta cuenta")
+    await db.users.update_one(
+        {"id": u["id"]},
+        {"$set": {"email_verified": True, "email_verified_at": now_iso()}},
+    )
+    await _audit("auth.email_verified", request=request, actor=u, target_id=u["id"])
+    return {"ok": True, "email": u["email"], "email_verified": True}
+
+
+@api.post("/auth/resend-verification")
+async def resend_verification(request: Request, user: dict = Depends(get_current_user)):
+    _check_rate_limit(request, "verify-resend", max_events=3, window=600, extra_key=user["id"])
+    if user.get("email_verified", True):
+        return {"ok": True, "already_verified": True, "email_sent": False}
+    result = await _issue_email_verification(user)
+    await _audit(
+        "auth.verification_resent",
+        request=request,
+        actor=user,
+        target_id=user["id"],
+        meta={"email_sent": result["email_sent"]},
+    )
+    payload = {
+        "ok": True,
+        "already_verified": False,
+        "email_sent": result["email_sent"],
+        "message": "Si el correo está disponible, recibirás un nuevo enlace de verificación.",
+    }
+    if EXPOSE_AUTH_LINKS:
+        payload["dev_link"] = result["link"]
+    return payload
 
 
 # --------------------------------------------------------------------
@@ -669,6 +956,19 @@ Recuerda: responde ÚNICAMENTE con JSON, sin ```json ni ningún envoltorio.
     except Exception as e:
         logger.warning(f"LLM plan generation fallback: {e}")
 
+    # Explicabilidad: cada tarea declara de dónde sale y por qué se recomienda.
+    causes_titles = [c["title"] for c in engine["causes"]]
+    cause_hint = (
+        " Responde a las causas detectadas: " + "; ".join(causes_titles[:3]) + "."
+        if causes_titles
+        else ""
+    )
+    source_refs = []
+    for chunk in rag_chunks:
+        doc_id = chunk.get("doc_id")
+        if doc_id and all(ref["id"] != doc_id for ref in source_refs):
+            source_refs.append({"id": doc_id, "title": chunk.get("doc_title") or "Documento Cultora"})
+
     # Build action items from template + AI recommendations
     action_items: List[Dict[str, Any]] = []
     for i, t in enumerate(template["tasks"]):
@@ -682,6 +982,8 @@ Recuerda: responde ÚNICAMENTE con JSON, sin ```json ni ningún envoltorio.
             "note": "",
             "order": i,
             "source": "template",
+            "source_label": "Método Cultora",
+            "why": f"Paso base del método Cultora para «{session['goal_title']}»." + cause_hint,
         })
     for i, rec in enumerate(narrative["recomendaciones"][:5]):
         # only include AI recs that don't overlap templates
@@ -698,6 +1000,13 @@ Recuerda: responde ÚNICAMENTE con JSON, sin ```json ni ningún envoltorio.
             "note": "",
             "order": len(action_items),
             "source": "ai",
+            "source_label": "IA personalizada",
+            "why": (
+                "Recomendación generada por IA a partir de tus respuestas"
+                + (f" y {len(rag_chunks)} fragmentos de la biblioteca Cultora" if rag_chunks else "")
+                + "."
+                + cause_hint
+            ),
         })
 
     plan = {
@@ -716,6 +1025,15 @@ Recuerda: responde ÚNICAMENTE con JSON, sin ```json ni ningún envoltorio.
         "action_items": action_items,
         "indicators": template["indicators"],
         "related_docs": _related_docs(goal_key),
+        "basis": {
+            "goal_text": session.get("goal_text") or "",
+            "answers": [
+                {"question": a.get("question", ""), "answer": a.get("answer", "")}
+                for a in session.get("answers", [])
+            ],
+            "profile": {k: v for k, v in profile.items() if v},
+            "knowledge_sources": source_refs[:5],
+        },
     }
     return plan
 
@@ -752,6 +1070,11 @@ async def get_plan(plan_id: str, user: dict = Depends(get_current_user)):
     doc = await db.plans.find_one({"id": plan_id, "user_id": user["id"]}, {"_id": 0})
     if not doc:
         raise HTTPException(status_code=404, detail="Plan no encontrado")
+    feedback_docs = await db.plan_feedback.find(
+        {"plan_id": plan_id, "user_id": user["id"]}, {"_id": 0}
+    ).to_list(500)
+    doc["feedback"] = next((f for f in feedback_docs if not f.get("item_id")), None)
+    doc["item_feedback"] = [f for f in feedback_docs if f.get("item_id")]
     return doc
 
 
@@ -787,6 +1110,47 @@ async def update_item(plan_id: str, item_id: str, body: UpdateItemIn, user: dict
     })
     doc = await db.plans.find_one({"id": plan_id}, {"_id": 0})
     return doc
+
+
+@api.post("/plans/{plan_id}/feedback")
+async def submit_plan_feedback(
+    plan_id: str,
+    body: PlanFeedbackIn,
+    request: Request,
+    user: dict = Depends(get_current_user),
+):
+    _check_rate_limit(request, "plan-feedback", max_events=60, window=600, extra_key=user["id"])
+    plan = await db.plans.find_one({"id": plan_id, "user_id": user["id"]}, {"_id": 0})
+    if not plan:
+        raise HTTPException(status_code=404, detail="Plan no encontrado")
+    item_id = (body.item_id or "").strip() or None
+    if item_id and not any(it.get("id") == item_id for it in plan.get("action_items", [])):
+        raise HTTPException(status_code=404, detail="Tarea no encontrada")
+    key = {"plan_id": plan_id, "user_id": user["id"], "item_id": item_id}
+    existing = await db.plan_feedback.find_one(key)
+    now = now_iso()
+    feedback = {
+        "id": existing["id"] if existing else new_id(),
+        **key,
+        "rating": body.rating,
+        "comment": (body.comment or "").strip(),
+        "created_at": existing["created_at"] if existing else now,
+        "updated_at": now,
+    }
+    await db.plan_feedback.update_one(key, {"$set": feedback}, upsert=True)
+    await _audit(
+        "plan.feedback",
+        request=request,
+        actor=user,
+        target_id=plan_id,
+        target_type="plan",
+        meta={
+            "rating": body.rating,
+            "has_comment": bool(feedback["comment"]),
+            "item_id": item_id,
+        },
+    )
+    return {"feedback": feedback}
 
 
 # --------------------------------------------------------------------
@@ -1338,6 +1702,17 @@ async def on_startup():
     except Exception as e:
         import logging
         logging.getLogger(__name__).warning(f"Object storage init failed: {e}")
+    # Índices de flujos de cuenta y feedback.
+    try:
+        await db.password_reset_tokens.create_index("expires_at_dt", expireAfterSeconds=0)
+        await db.email_verification_tokens.create_index("expires_at_dt", expireAfterSeconds=0)
+        await db.plan_feedback.create_index(
+            [("plan_id", 1), ("user_id", 1), ("item_id", 1)], unique=True
+        )
+        await db.plan_feedback.create_index("user_id")
+        await db.plan_feedback.create_index([("plan_id", 1), ("rating", 1)])
+    except Exception as e:
+        logger.warning("No se pudieron crear índices de auth/feedback: %s", e)
 
 
 @api.get("/forum/meta")
