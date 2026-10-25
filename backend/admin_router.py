@@ -13,17 +13,22 @@ Uso desde server.py:
 """
 import logging
 import re
+import secrets
+import string
 import uuid
 from datetime import datetime, timezone, timedelta
 from typing import Any, Dict, List, Optional, Set
 
+import bcrypt
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from fastapi.responses import Response
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
+from pymongo.errors import DuplicateKeyError
 
 from admin_permissions import PERMISSIONS, ROLE_DEFINITIONS, permissions_for_role
 from notifications import refresh_notifications, notify as _notify_helper
 from rag import chunk_text, search as kb_search, bump_version as kb_bump, format_context_block
+from security_lib import INITIAL_SESSION_VERSION, admin_password_policy
 from taxonomy import DECISION_RULES as _DEFAULT_RULES, GOAL_CATALOG, DIAGNOSTIC_QUESTIONS, PLAN_TEMPLATES
 
 logger = logging.getLogger(__name__)
@@ -38,6 +43,19 @@ def _now_iso() -> str:
 
 def _new_id() -> str:
     return str(uuid.uuid4())
+
+
+def _generate_temp_password(length: int = 16) -> str:
+    alphabet = string.ascii_letters + string.digits + "!@#$%&*"
+    while True:
+        pwd = "".join(secrets.choice(alphabet) for _ in range(length))
+        if (
+            any(c.islower() for c in pwd)
+            and any(c.isupper() for c in pwd)
+            and any(c.isdigit() for c in pwd)
+            and any(c in "!@#$%&*" for c in pwd)
+        ):
+            return pwd
 
 
 def _user_perms(user: Dict[str, Any]) -> Set[str]:
@@ -195,6 +213,62 @@ def build_admin_router(db, get_current_user) -> APIRouter:
             u["is_active"] = u.get("status") == "active"
         return {"count": len(items), "total": total, "page": page, "limit": lim,
                 "has_more": skip + len(items) < total, "items": items}
+
+    class AdminUserCreateIn(BaseModel):
+        name: str = Field(min_length=2, max_length=120)
+        email: EmailStr
+        role: Optional[str] = None
+
+    @router.post("/users")
+    async def create_user(body: AdminUserCreateIn, user=Depends(_require("users.create"))):
+        email = str(body.email).strip().lower()
+        name = body.name.strip()
+        if len(name) < 2:
+            raise HTTPException(400, "El nombre debe tener al menos 2 caracteres")
+        if await db.users.find_one({"email": email}, {"id": 1}):
+            raise HTTPException(409, "Ya existe una cuenta con ese email")
+
+        role_key = (body.role or "").strip() or None
+        role_fields: Dict[str, Any] = {}
+        if role_key:
+            if role_key == "superadmin" and user.get("admin_role") != "superadmin":
+                raise HTTPException(403, "Sólo un superadmin puede crear otro superadmin.")
+            if role_key in ROLE_DEFINITIONS:
+                role_fields["admin_role"] = role_key
+            else:
+                custom = await db.admin_roles.find_one(
+                    {"key": role_key, "deleted_at": {"$exists": False}}
+                )
+                if not custom:
+                    raise HTTPException(400, "Rol inválido")
+                role_fields["admin_role"] = role_key
+                role_fields["admin_permissions"] = custom.get("permissions") or []
+
+        temp_password = _generate_temp_password()
+        admin_password_policy(temp_password)
+
+        doc = {
+            "id": _new_id(),
+            "email": email,
+            "name": name,
+            "password_hash": bcrypt.hashpw(temp_password.encode(), bcrypt.gensalt()).decode(),
+            "created_at": _now_iso(),
+            "profile": {},
+            "session_version": INITIAL_SESSION_VERSION,
+            "status": "active",
+            "email_verified": True,
+            "must_change_password": True,
+            "created_by_admin_id": user["id"],
+            **role_fields,
+        }
+        try:
+            await db.users.insert_one(doc)
+        except DuplicateKeyError:
+            raise HTTPException(409, "Ya existe una cuenta con ese email")
+        await _log(user, "user.created", "user", doc["id"],
+                   {"role": role_key, "email": email})
+        safe_user = {k: v for k, v in doc.items() if k != "password_hash"}
+        return {"ok": True, "user": safe_user, "temporary_password": temp_password}
 
     @router.get("/users/{uid}")
     async def get_user(uid: str, user=Depends(_require("users.view"))):

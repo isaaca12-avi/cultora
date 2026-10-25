@@ -12,6 +12,7 @@ export const adminApi = {
   users: {
     list: (params) => http.get("/admin/users", { params }).then((r) => r.data),
     get: (uid) => http.get(`/admin/users/${uid}`).then((r) => r.data),
+    create: (payload) => http.post("/admin/users", payload).then((r) => r.data),
     setRole: (uid, role) => http.put(`/admin/users/${uid}/role`, { role }).then((r) => r.data),
     setStatus: (uid, status, reason) =>
       http.put(`/admin/users/${uid}/status`, { status, reason }).then((r) => r.data),

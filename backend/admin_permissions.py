@@ -16,6 +16,7 @@ from typing import Dict, List, Set
 PERMISSIONS: List[Dict[str, str]] = [
     # Usuarios
     {"key": "users.view", "module": "users", "label": "Ver usuarios"},
+    {"key": "users.create", "module": "users", "label": "Crear usuario"},
     {"key": "users.edit_role", "module": "users", "label": "Cambiar rol de usuario"},
     {"key": "users.suspend", "module": "users", "label": "Suspender usuario"},
     {"key": "users.reactivate", "module": "users", "label": "Reactivar usuario"},

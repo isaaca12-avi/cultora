@@ -6,7 +6,10 @@ import { AdminPageHeader, StatusPill, EmptyState, LoadingRows } from "@/componen
 import { ConfirmDialog } from "@/components/admin/ConfirmDialog";
 import { DetailDrawer, DetailSection, DetailRow, DetailHistory } from "@/components/admin/DetailDrawer";
 import Pagination from "@/components/admin/Pagination";
-import { MagnifyingGlass, DotsThreeVertical, Users } from "@phosphor-icons/react";
+import { MagnifyingGlass, DotsThreeVertical, Users, Plus, Copy, Check } from "@phosphor-icons/react";
+import {
+  Dialog, DialogContent, DialogHeader, DialogFooter, DialogTitle, DialogDescription,
+} from "@/components/ui/dialog";
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
@@ -29,6 +32,7 @@ export default function AdminUsers() {
   const [confirm, setConfirm] = useState(null);
   const [detail, setDetail] = useState(null);
   const [rolesCatalog, setRolesCatalog] = useState(SYSTEM_ROLES);
+  const [createOpen, setCreateOpen] = useState(false);
 
   const load = async () => {
     setData(null);
@@ -130,6 +134,16 @@ export default function AdminUsers() {
             <option value="none">Sin rol admin</option>
             {rolesCatalog.filter(r => r.value).map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
           </select>
+          {has("users.create") ? (
+            <button
+              className="admin-btn admin-btn-primary"
+              onClick={() => setCreateOpen(true)}
+              data-testid="admin-create-user-open"
+            >
+              <Plus size={14} weight="bold" />
+              Crear usuario
+            </button>
+          ) : null}
         </div>
       </AdminPageHeader>
 
@@ -211,7 +225,213 @@ export default function AdminUsers() {
         onConfirm={confirm?.onConfirm}
         variant={confirm?.variant}
       />
+
+      <CreateUserDialog
+        open={createOpen}
+        onOpenChange={setCreateOpen}
+        rolesCatalog={rolesCatalog}
+        isSuperadmin={admin?.admin_role === "superadmin"}
+        onCreated={load}
+      />
     </div>
+  );
+}
+
+function CreateUserDialog({ open, onOpenChange, rolesCatalog, isSuperadmin, onCreated }) {
+  const [form, setForm] = useState({ name: "", email: "", role: "" });
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [result, setResult] = useState(null);
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    setForm({ name: "", email: "", role: "" });
+    setBusy(false);
+    setError("");
+    setResult(null);
+    setCopied(false);
+  }, [open]);
+
+  const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim());
+  const valid = form.name.trim().length >= 2 && emailOk;
+
+  const submit = async (e) => {
+    e.preventDefault();
+    if (!valid || busy) return;
+    setBusy(true);
+    setError("");
+    try {
+      const res = await adminApi.users.create({
+        name: form.name.trim(),
+        email: form.email.trim(),
+        role: form.role || null,
+      });
+      setResult(res);
+      onCreated?.();
+      toast.success("Usuario creado");
+    } catch (e) {
+      const detail = e?.response?.data?.detail;
+      setError(
+        typeof detail === "string"
+          ? detail
+          : "No pudimos crear el usuario. Revisa los datos e inténtalo de nuevo."
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const roleLabel = result
+    ? rolesCatalog.find((r) => r.value === (result.user.admin_role || ""))?.label || "Sin rol"
+    : "";
+
+  const copyCredentials = async () => {
+    if (!result) return;
+    const text = `Cultora\nEmail: ${result.user.email}\nContraseña temporal: ${result.temporary_password}`;
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      toast.success("Credenciales copiadas");
+    } catch {
+      toast.error("No se pudo copiar. Selecciona el texto manualmente.");
+    }
+  };
+
+  const roleOptions = rolesCatalog.filter((r) => r.value !== "superadmin" || isSuperadmin);
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent
+        className="border-0 shadow-2xl p-0 max-w-lg"
+        style={{ background: "var(--a-surface)", color: "var(--a-text)" }}
+        data-testid="admin-create-user"
+      >
+        <form onSubmit={submit}>
+          <div className="p-6">
+            <DialogHeader className="text-left space-y-1.5">
+              <DialogTitle className="text-[17px] font-semibold tracking-tight" style={{ color: "var(--a-text)" }}>
+                {result ? "Usuario creado" : "Crear usuario"}
+              </DialogTitle>
+              <DialogDescription className="admin-text-muted text-[12.5px] leading-relaxed">
+                {result
+                  ? "Comparte estas credenciales por un canal seguro."
+                  : "Se generará una contraseña temporal que la persona deberá cambiar en su primer inicio de sesión."}
+              </DialogDescription>
+            </DialogHeader>
+
+            {result ? (
+              <div className="mt-5 space-y-4">
+                <div className="flex items-center gap-2.5">
+                  <span className="grid h-8 w-8 place-items-center rounded-full" style={{ background: "var(--a-surface-2)" }}>
+                    <Check size={16} weight="bold" />
+                  </span>
+                  <div className="min-w-0">
+                    <div className="text-[13.5px] font-medium truncate">{result.user.name}</div>
+                    <div className="text-[12px] admin-text-muted truncate">{result.user.email}</div>
+                  </div>
+                </div>
+
+                <div className="rounded-lg border admin-border p-3.5 space-y-2" style={{ background: "var(--a-surface-2)" }}>
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-[11px] uppercase tracking-wider admin-text-faint">Rol</span>
+                    <span className="text-[12.5px]">{roleLabel}</span>
+                  </div>
+                  <div>
+                    <div className="text-[11px] uppercase tracking-wider admin-text-faint">Contraseña temporal</div>
+                    <div className="mt-1 flex items-center gap-2">
+                      <code className="flex-1 font-mono text-[13px] break-all" data-testid="admin-create-user-password">
+                        {result.temporary_password}
+                      </code>
+                      <button type="button" className="admin-btn admin-btn-ghost shrink-0" onClick={copyCredentials}>
+                        {copied ? <Check size={13} /> : <Copy size={13} />}
+                        {copied ? "Copiado" : "Copiar"}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <p className="text-[11.5px] admin-text-muted leading-relaxed">
+                  Guarda o comparte la contraseña ahora: no se volverá a mostrar. La cuenta se creó
+                  verificada y activa; al entrar se le pedirá cambiarla.
+                </p>
+              </div>
+            ) : (
+              <div className="mt-5 space-y-4">
+                <label className="block">
+                  <div className="mb-1.5 text-[11.5px] font-medium">Nombre completo</div>
+                  <input
+                    className="admin-input w-full"
+                    value={form.name}
+                    onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+                    placeholder="Nombre y apellido"
+                    autoFocus
+                    data-testid="admin-create-user-name"
+                  />
+                </label>
+                <label className="block">
+                  <div className="mb-1.5 text-[11.5px] font-medium">Correo electrónico</div>
+                  <input
+                    type="email"
+                    className="admin-input w-full"
+                    value={form.email}
+                    onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
+                    placeholder="persona@correo.com"
+                    data-testid="admin-create-user-email"
+                  />
+                </label>
+                <label className="block">
+                  <div className="mb-1.5 text-[11.5px] font-medium">Rol en la plataforma</div>
+                  <select
+                    className="admin-select w-full"
+                    value={form.role}
+                    onChange={(e) => setForm((f) => ({ ...f, role: e.target.value }))}
+                    data-testid="admin-create-user-role"
+                  >
+                    {roleOptions.map((r) => (
+                      <option key={r.value || "none"} value={r.value}>{r.label}</option>
+                    ))}
+                  </select>
+                  <div className="mt-1.5 text-[11px] admin-text-faint">
+                    Sin rol = usuario normal. Los roles admin dan acceso al panel según sus permisos.
+                  </div>
+                </label>
+                {error ? (
+                  <div
+                    className="rounded-lg px-3 py-2 text-[12px]"
+                    style={{ background: "rgba(220, 38, 38, 0.08)", color: "var(--a-danger)" }}
+                  >
+                    {error}
+                  </div>
+                ) : null}
+              </div>
+            )}
+          </div>
+
+          <DialogFooter className="p-4 border-t admin-border sm:justify-end gap-2" style={{ background: "var(--a-surface-2)" }}>
+            {result ? (
+              <button type="button" className="admin-btn admin-btn-primary" onClick={() => onOpenChange(false)}>
+                Cerrar
+              </button>
+            ) : (
+              <>
+                <button type="button" className="admin-btn admin-btn-ghost" onClick={() => onOpenChange(false)}>
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="admin-btn admin-btn-primary"
+                  disabled={!valid || busy}
+                  data-testid="admin-create-user-submit"
+                >
+                  {busy ? "Creando…" : "Crear usuario"}
+                </button>
+              </>
+            )}
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }
 
