@@ -70,6 +70,20 @@ const PROFILE_LABELS = {
   formalized: "Formalización",
 };
 
+function withPlanDefaults(plan) {
+  if (!plan || typeof plan !== "object") return null;
+  const arr = (v) => (Array.isArray(v) ? v : []);
+  return {
+    ...plan,
+    action_items: arr(plan.action_items),
+    indicators: arr(plan.indicators),
+    related_docs: arr(plan.related_docs),
+    causas: arr(plan.causas),
+    prioridades: arr(plan.prioridades),
+    item_feedback: arr(plan.item_feedback),
+  };
+}
+
 export default function PlanView() {
   const { planId } = useParams();
   const { user } = useAuth();
@@ -89,7 +103,12 @@ export default function PlanView() {
       .get(planId)
       .then((p) => {
         if (!alive) return;
-        setPlan(p);
+        const normalized = withPlanDefaults(p);
+        if (!normalized) {
+          setNotFound(true);
+          return;
+        }
+        setPlan(normalized);
         setRating(p.feedback?.rating || null);
         setComment(p.feedback?.comment || "");
       })
@@ -145,11 +164,13 @@ export default function PlanView() {
     setSavingItem(itemId);
     try {
       const updated = await plansApi.updateItem(planId, itemId, payload);
-      setPlan((prev) => ({
-        ...updated,
-        feedback: prev?.feedback || null,
-        item_feedback: prev?.item_feedback || [],
-      }));
+      setPlan((prev) =>
+        withPlanDefaults({
+          ...updated,
+          feedback: prev?.feedback || null,
+          item_feedback: prev?.item_feedback || [],
+        })
+      );
       return true;
     } catch (e) {
       toast.error("No pudimos actualizar la tarea");

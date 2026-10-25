@@ -13,10 +13,15 @@ export default function GoalsPage() {
   const [selected, setSelected] = useState(null);
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(false);
+  const [reload, setReload] = useState(0);
 
   useEffect(() => {
-    goalsApi.catalog().then(setCatalog);
-  }, []);
+    setError(false);
+    goalsApi.catalog()
+      .then((r) => setCatalog(Array.isArray(r) ? r : []))
+      .catch(() => setError(true));
+  }, [reload]);
 
   const start = async () => {
     if (!selected) {
@@ -43,6 +48,18 @@ export default function GoalsPage() {
       <p className="text-obsidian/70 max-w-2xl leading-relaxed mb-10">
         Elige el objetivo que más te apremia. En 5 minutos tendrás un diagnóstico y un plan concreto.
       </p>
+
+      {error ? (
+        <div className="mb-10 flex flex-wrap items-center justify-between gap-4 border border-obsidian/10 bg-white p-6 rounded-md">
+          <div>
+            <div className="font-medium text-obsidian">No pudimos cargar los objetivos</div>
+            <div className="text-sm text-obsidian/60">Revisa tu conexión e inténtalo de nuevo.</div>
+          </div>
+          <Button variant="outline" onClick={() => setReload((n) => n + 1)} className="rounded-full border-obsidian/20 bg-transparent hover:bg-linen h-10 px-6">
+            Reintentar
+          </Button>
+        </div>
+      ) : null}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-px bg-obsidian/10 border border-obsidian/10 mb-12">
         {catalog.map((g) => {

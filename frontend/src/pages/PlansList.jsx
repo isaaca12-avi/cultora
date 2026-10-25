@@ -32,9 +32,9 @@ export default function PlansList() {
 
   const stats = useMemo(() => {
     const list = items || [];
-    const tasks = list.reduce((acc, p) => acc + p.action_items.length, 0);
+    const tasks = list.reduce((acc, p) => acc + (p.action_items || []).length, 0);
     const done = list.reduce(
-      (acc, p) => acc + p.action_items.filter((i) => i.status === "done").length,
+      (acc, p) => acc + (p.action_items || []).filter((i) => i.status === "done").length,
       0
     );
     return {
@@ -48,10 +48,10 @@ export default function PlansList() {
   const visible = useMemo(() => {
     const list = items || [];
     if (filter === "done") {
-      return list.filter((p) => p.action_items.length > 0 && p.action_items.every((i) => i.status === "done"));
+      return list.filter((p) => (p.action_items || []).length > 0 && (p.action_items || []).every((i) => i.status === "done"));
     }
     if (filter === "active") {
-      return list.filter((p) => !(p.action_items.length > 0 && p.action_items.every((i) => i.status === "done")));
+      return list.filter((p) => !((p.action_items || []).length > 0 && (p.action_items || []).every((i) => i.status === "done")));
     }
     return list;
   }, [items, filter]);
@@ -129,11 +129,12 @@ export default function PlansList() {
 }
 
 function PlanCard({ plan }) {
-  const total = plan.action_items.length;
-  const done = plan.action_items.filter((i) => i.status === "done").length;
-  const inProgress = plan.action_items.filter((i) => i.status === "in_progress").length;
+  const items = plan.action_items || [];
+  const total = items.length;
+  const done = items.filter((i) => i.status === "done").length;
+  const inProgress = items.filter((i) => i.status === "in_progress").length;
   const pct = total ? Math.round((done / total) * 100) : 0;
-  const next = plan.action_items.find((i) => i.status !== "done");
+  const next = items.find((i) => i.status !== "done");
   const complete = total > 0 && done === total;
   const created = new Date(plan.created_at).toLocaleDateString("es", {
     day: "numeric",
@@ -209,7 +210,7 @@ function PlanCard({ plan }) {
             </span>
             <span className="inline-flex items-center gap-1">
               <Target size={12} />
-              {plan.indicators.length} indicadores
+              {plan.indicators?.length || 0} indicadores
             </span>
           </div>
           <span className="inline-flex items-center gap-1 text-[12px] font-medium text-obsidian/55 transition-colors group-hover:text-terracotta">

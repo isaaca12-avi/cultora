@@ -23,12 +23,15 @@ export default function Knowledge() {
   const [active, setActive] = useState(null);
 
   useEffect(() => {
-    knowledge.categories().then(setCats);
-    knowledge.list().then(setDocs);
+    knowledge.categories()
+      .then((r) => setCats(Array.isArray(r) ? r : []))
+      .catch(() => setCats([]));
   }, []);
 
   useEffect(() => {
-    knowledge.list(active || undefined).then(setDocs);
+    knowledge.list(active || undefined)
+      .then((r) => setDocs(Array.isArray(r) ? r : []))
+      .catch(() => setDocs([]));
   }, [active]);
 
   return (

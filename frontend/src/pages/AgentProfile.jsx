@@ -27,12 +27,24 @@ export default function AgentProfile() {
   const { agentId } = useParams();
   const [agent, setAgent] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [notFound, setNotFound] = useState(false);
 
   const load = async () => {
+    setNotFound(false);
     try {
       const a = await agentsApi.get(agentId);
-      setAgent(a);
+      if (!a || typeof a !== "object") throw new Error("empty");
+      const arr = (v) => (Array.isArray(v) ? v : []);
+      setAgent({
+        ...a,
+        capabilities: arr(a.capabilities),
+        interests: arr(a.interests),
+        offers_tags: arr(a.offers_tags),
+        needs_tags: arr(a.needs_tags),
+        projects: arr(a.projects),
+      });
     } catch {
+      setNotFound(true);
       toast.error("Agente no encontrado");
     }
   };
@@ -41,9 +53,30 @@ export default function AgentProfile() {
     load();
   }, [agentId]);
 
+  if (notFound) {
+    return (
+      <div className="mx-auto max-w-lg border border-obsidian/10 bg-white p-12 text-center rounded-md">
+        <div className="font-serif-display text-3xl italic text-terracotta mb-3">Agente no encontrado</div>
+        <p className="text-obsidian/60 mb-6">Puede que el perfil ya no esté publicado.</p>
+        <Link
+          to="/agentes"
+          className="inline-flex items-center justify-center rounded-full bg-obsidian text-alabaster h-10 px-6 text-sm font-medium hover:bg-obsidian/90"
+        >
+          Volver al directorio
+        </Link>
+      </div>
+    );
+  }
+
   if (!agent) return <div className="font-serif-display text-2xl text-obsidian/50">Cargando…</div>;
 
-  const initials = agent.name.split(" ").filter(Boolean).slice(0, 2).map((s) => s[0]).join("").toUpperCase();
+  const initials = (agent.name || "")
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((s) => s[0])
+    .join("")
+    .toUpperCase();
 
   const toggleSave = async () => {
     setSaving(true);

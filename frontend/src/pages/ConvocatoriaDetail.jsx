@@ -40,10 +40,48 @@ function fmtAmount(min, max, moneda) {
 export default function ConvocatoriaDetail() {
   const { convId } = useParams();
   const [c, setC] = useState(null);
+  const [notFound, setNotFound] = useState(false);
 
   useEffect(() => {
-    convApi.get(convId).then(setC).catch(() => toast.error("Convocatoria no encontrada"));
+    let alive = true;
+    setNotFound(false);
+    convApi.get(convId)
+      .then((data) => {
+        if (!alive) return;
+        if (!data || typeof data !== "object") {
+          setNotFound(true);
+          return;
+        }
+        const arr = (v) => (Array.isArray(v) ? v : []);
+        setC({
+          ...data,
+          types: arr(data.types),
+          proponents: arr(data.proponents),
+          requirements: arr(data.requirements),
+          benefits: arr(data.benefits),
+          documents: arr(data.documents),
+          fundable: arr(data.fundable),
+          restrictions: arr(data.restrictions),
+          areas: arr(data.areas),
+        });
+      })
+      .catch(() => {
+        if (alive) setNotFound(true);
+      });
+    return () => { alive = false; };
   }, [convId]);
+
+  if (notFound) {
+    return (
+      <div className="mx-auto max-w-lg border border-obsidian/10 bg-white p-12 text-center rounded-md">
+        <div className="font-serif-display text-3xl italic text-terracotta mb-3">Convocatoria no encontrada</div>
+        <p className="text-obsidian/60 mb-6">Puede que se haya cerrado o eliminado.</p>
+        <Link to="/convocatorias" className="text-sm font-medium text-obsidian underline underline-offset-4 hover:text-terracotta">
+          Volver al directorio
+        </Link>
+      </div>
+    );
+  }
 
   if (!c) return <div className="font-serif-display text-2xl text-obsidian/50">Cargando…</div>;
 

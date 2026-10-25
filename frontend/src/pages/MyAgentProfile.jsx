@@ -48,18 +48,31 @@ export default function MyAgentProfile() {
   const [published, setPublished] = useState(false);
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+  const [reload, setReload] = useState(0);
 
   useEffect(() => {
-    agentsApi.mine().then((r) => {
-      setPublished(Boolean(r.published));
-      if (r.profile && Object.keys(r.profile).length) {
-        setForm({ ...emptyForm, ...r.profile, name: r.profile.name || user?.name || "" });
-      } else {
-        setForm((f) => ({ ...f, name: user?.name || "" }));
-      }
-      setLoading(false);
-    });
-  }, [user]);
+    let cancelled = false;
+    setLoading(true);
+    setError(false);
+    agentsApi.mine()
+      .then((r) => {
+        if (cancelled) return;
+        setPublished(Boolean(r?.published));
+        if (r?.profile && Object.keys(r.profile).length) {
+          setForm({ ...emptyForm, ...r.profile, name: r.profile.name || user?.name || "" });
+        } else {
+          setForm((f) => ({ ...f, name: user?.name || "" }));
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setError(true);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [user, reload]);
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
@@ -127,6 +140,21 @@ export default function MyAgentProfile() {
   const projectsInput = useMemo(() => form.projects || [""], [form.projects]);
 
   if (loading) return <div className="font-serif-display text-2xl text-obsidian/50">Cargando…</div>;
+  if (error) {
+    return (
+      <div className="max-w-2xl mx-auto border border-obsidian/10 bg-white p-12 text-center rounded-md">
+        <div className="font-serif-display text-3xl italic text-terracotta mb-3">No pudimos cargar tu perfil</div>
+        <p className="text-obsidian/60 mb-6">Revisa tu conexión e inténtalo de nuevo.</p>
+        <Button
+          variant="outline"
+          onClick={() => setReload((n) => n + 1)}
+          className="rounded-full border-obsidian/20 bg-transparent hover:bg-linen h-10 px-6"
+        >
+          Reintentar
+        </Button>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-4xl">

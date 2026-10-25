@@ -45,8 +45,8 @@ const AVAILABILITY_ORDER = {
 
 function sortItems(items, key) {
   const arr = [...items];
-  if (key === "name") arr.sort((a, b) => a.name.localeCompare(b.name));
-  else if (key === "city") arr.sort((a, b) => a.city.localeCompare(b.city) || a.name.localeCompare(b.name));
+  if (key === "name") arr.sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+  else if (key === "city") arr.sort((a, b) => (a.city || "").localeCompare(b.city || "") || (a.name || "").localeCompare(b.name || ""));
   else if (key === "availability")
     arr.sort((a, b) => (AVAILABILITY_ORDER[a.availability] ?? 9) - (AVAILABILITY_ORDER[b.availability] ?? 9));
   return arr;
@@ -67,10 +67,20 @@ export default function AgentsList() {
   const debouncedQ = useDebounced(q, 250);
 
   useEffect(() => {
-    agentsApi.filters().then(setOpts);
-    agentsApi.saved().then((r) => setSaved(new Set(r.items.map((i) => i.id)))).catch(() => {});
+    agentsApi.filters().then(setOpts).catch(() => setOpts(null));
+    agentsApi.saved().then((r) => setSaved(new Set((r?.items || []).map((i) => i.id)))).catch(() => {});
     agentsApi.mine().then(setMine).catch(() => {});
   }, []);
+
+  const filterOpts = useMemo(() => ({
+    cities: Array.isArray(opts?.cities) ? opts.cities : [],
+    disciplines: Array.isArray(opts?.disciplines) ? opts.disciplines : [],
+    roles: Array.isArray(opts?.roles) ? opts.roles : [],
+    agent_types: Array.isArray(opts?.agent_types) ? opts.agent_types : [],
+    availability: Array.isArray(opts?.availability) ? opts.availability : [],
+    capabilities: Array.isArray(opts?.capabilities) ? opts.capabilities : [],
+    interests: Array.isArray(opts?.interests) ? opts.interests : [],
+  }), [opts]);
 
   const activeParams = useMemo(() => {
     const p = { ...filters };
@@ -82,13 +92,17 @@ export default function AgentsList() {
 
   useEffect(() => {
     setLoading(true);
-    agentsApi.list(activeParams).then((d) => {
-      setData(d);
-      setLoading(false);
-    });
+    agentsApi
+      .list(activeParams)
+      .then((d) => setData(d && typeof d === "object" ? d : { count: 0, items: [] }))
+      .catch(() => setData({ count: 0, items: [] }))
+      .finally(() => setLoading(false));
   }, [activeParams]);
 
-  const items = useMemo(() => sortItems(data.items, sort), [data.items, sort]);
+  const items = useMemo(
+    () => sortItems(Array.isArray(data.items) ? data.items : [], sort),
+    [data.items, sort]
+  );
 
   const setFilter = (k, v) => setFilters((f) => ({ ...f, [k]: v === ANY ? undefined : v }));
   const toggle = (arr, setArr, v) => setArr(arr.includes(v) ? arr.filter((x) => x !== v) : [...arr, v]);
@@ -159,9 +173,9 @@ export default function AgentsList() {
             {opts ? (
               <div className="flex flex-wrap gap-x-10 gap-y-4">
                 <Stat label="agentes" value={data.count} />
-                <Stat label="ciudades" value={opts.cities.length} />
-                <Stat label="disciplinas" value={opts.disciplines.length} />
-                <Stat label="capacidades" value={opts.capabilities.length} />
+                <Stat label="ciudades" value={filterOpts.cities.length} />
+                <Stat label="disciplinas" value={filterOpts.disciplines.length} />
+                <Stat label="capacidades" value={filterOpts.capabilities.length} />
               </div>
             ) : <span />}
 
@@ -217,14 +231,14 @@ export default function AgentsList() {
               </SheetHeader>
               {opts ? (
                 <div className="space-y-8 pb-24">
-                  <FilterSelect testId={AGENTS.filterCity} label="Ciudad" value={filters.city} onChange={(v) => setFilter("city", v)} options={opts.cities} />
-                  <FilterSelect testId={AGENTS.filterDiscipline} label="Disciplina" value={filters.discipline} onChange={(v) => setFilter("discipline", v)} options={opts.disciplines} />
-                  <FilterSelect testId={AGENTS.filterRole} label="Rol" value={filters.role} onChange={(v) => setFilter("role", v)} options={opts.roles} />
-                  <FilterSelect testId={AGENTS.filterType} label="Tipo de agente" value={filters.agent_type} onChange={(v) => setFilter("agent_type", v)} options={opts.agent_types} />
-                  <FilterSelect testId={AGENTS.filterAvailability} label="Disponibilidad" value={filters.availability} onChange={(v) => setFilter("availability", v)} options={opts.availability} />
+                  <FilterSelect testId={AGENTS.filterCity} label="Ciudad" value={filters.city} onChange={(v) => setFilter("city", v)} options={filterOpts.cities} />
+                  <FilterSelect testId={AGENTS.filterDiscipline} label="Disciplina" value={filters.discipline} onChange={(v) => setFilter("discipline", v)} options={filterOpts.disciplines} />
+                  <FilterSelect testId={AGENTS.filterRole} label="Rol" value={filters.role} onChange={(v) => setFilter("role", v)} options={filterOpts.roles} />
+                  <FilterSelect testId={AGENTS.filterType} label="Tipo de agente" value={filters.agent_type} onChange={(v) => setFilter("agent_type", v)} options={filterOpts.agent_types} />
+                  <FilterSelect testId={AGENTS.filterAvailability} label="Disponibilidad" value={filters.availability} onChange={(v) => setFilter("availability", v)} options={filterOpts.availability} />
 
-                  <ChipGroup title="Capacidades" values={opts.capabilities} selected={selectedCaps} onToggle={(v) => toggle(selectedCaps, setSelectedCaps, v)} testId={AGENTS.filterCapability} />
-                  <ChipGroup title="Intereses" values={opts.interests} selected={selectedInts} onToggle={(v) => toggle(selectedInts, setSelectedInts, v)} testId={AGENTS.filterInterest} accent />
+                  <ChipGroup title="Capacidades" values={filterOpts.capabilities} selected={selectedCaps} onToggle={(v) => toggle(selectedCaps, setSelectedCaps, v)} testId={AGENTS.filterCapability} />
+                  <ChipGroup title="Intereses" values={filterOpts.interests} selected={selectedInts} onToggle={(v) => toggle(selectedInts, setSelectedInts, v)} testId={AGENTS.filterInterest} accent />
                 </div>
               ) : null}
               <div className="fixed bottom-0 left-0 right-0 sm:max-w-md sm:left-auto p-4 bg-alabaster border-t border-obsidian/10 flex gap-3">
@@ -336,7 +350,7 @@ function FilterSelect({ label, value, onChange, options, testId }) {
         </SelectTrigger>
         <SelectContent>
           <SelectItem value={ANY}>Todos</SelectItem>
-          {options.map((o) => (
+          {(options || []).map((o) => (
             <SelectItem key={o} value={o}>{o}</SelectItem>
           ))}
         </SelectContent>
@@ -350,7 +364,7 @@ function ChipGroup({ title, values, selected, onToggle, testId, accent }) {
     <div>
       <div className="font-mono-meta text-obsidian/50 mb-3">{title}</div>
       <div className="flex flex-wrap gap-2">
-        {values.map((v) => {
+        {(values || []).map((v) => {
           const active = selected.includes(v);
           return (
             <button

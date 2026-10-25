@@ -19,12 +19,16 @@ export default function ForumTopic() {
   const [data, setData] = useState(null);
   const [reply, setReply] = useState("");
   const [busy, setBusy] = useState(false);
+  const [notFound, setNotFound] = useState(false);
 
   const load = async () => {
     try {
       const d = await forumApi.get(topicId);
+      if (!d?.topic) throw new Error("empty");
       setData(d);
+      setNotFound(false);
     } catch {
+      setNotFound(true);
       toast.error("No pudimos cargar el tema");
     }
   };
@@ -33,9 +37,22 @@ export default function ForumTopic() {
     load();
   }, [topicId]);
 
+  if (notFound) {
+    return (
+      <div className="mx-auto max-w-lg border border-obsidian/10 bg-white p-12 text-center rounded-md">
+        <div className="font-serif-display text-3xl italic text-terracotta mb-3">Tema no encontrado</div>
+        <p className="text-obsidian/60 mb-6">Puede que se haya eliminado o no tengas acceso.</p>
+        <Link to="/foro" className="text-sm font-medium text-obsidian underline underline-offset-4 hover:text-terracotta">
+          Volver al foro
+        </Link>
+      </div>
+    );
+  }
+
   if (!data) return <div className="font-serif-display text-2xl text-obsidian/50">Cargando…</div>;
 
-  const { topic, replies } = data;
+  const { topic } = data;
+  const replies = Array.isArray(data.replies) ? data.replies : [];
   const meta = KIND_META[topic.kind] || KIND_META.pregunta;
   const Icon = meta.icon;
 

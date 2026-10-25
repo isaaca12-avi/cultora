@@ -52,6 +52,20 @@ function fmtDate(iso) {
   return new Date(iso).toLocaleDateString("es", { day: "numeric", month: "short", year: "numeric" });
 }
 
+function normalizeConv(c) {
+  if (!c || typeof c !== "object") return null;
+  const arr = (v) => (Array.isArray(v) ? v : []);
+  return { ...c, types: arr(c.types), areas: arr(c.areas) };
+}
+
+function normalizeRecs(r) {
+  if (!r || typeof r !== "object") return null;
+  const recommendations = (Array.isArray(r.recommendations) ? r.recommendations : [])
+    .map(normalizeConv)
+    .filter(Boolean);
+  return { ...r, recommendations };
+}
+
 export default function Convocatorias() {
   const { user } = useAuth();
   const [items, setItems] = useState([]);
@@ -62,19 +76,22 @@ export default function Convocatorias() {
   const [sort, setSort] = useState("close_date");
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+  const [reload, setReload] = useState(0);
   const [recs, setRecs] = useState(null);
   const [recsLoading, setRecsLoading] = useState(false);
   const debouncedQ = useDebounced(q, 250);
+  const filterOpts = opts && typeof opts === "object" ? opts : {};
 
   useEffect(() => {
-    convApi.filters().then(setOpts);
+    convApi.filters().then(setOpts).catch(() => setOpts(null));
   }, []);
 
   useEffect(() => {
     if (!user) return;
     setRecsLoading(true);
     convApi.recommendations()
-      .then((r) => setRecs(r))
+      .then((r) => setRecs(normalizeRecs(r)))
       .catch(() => setRecs(null))
       .finally(() => setRecsLoading(false));
   }, [user]);
@@ -83,7 +100,7 @@ export default function Convocatorias() {
     setRecsLoading(true);
     try {
       const r = await convApi.recommendations(true);
-      setRecs(r);
+      setRecs(normalizeRecs(r));
       toast.success("Recomendaciones actualizadas");
     } catch {
       toast.error("No pudimos actualizar las recomendaciones");
@@ -103,12 +120,20 @@ export default function Convocatorias() {
 
   useEffect(() => {
     setLoading(true);
-    convApi.list(params).then((r) => {
-      setItems(r.items);
-      setCount(r.count);
-      setLoading(false);
-    });
-  }, [params]);
+    setError(false);
+    convApi
+      .list(params)
+      .then((r) => {
+        setItems((Array.isArray(r?.items) ? r.items : []).map(normalizeConv).filter(Boolean));
+        setCount(Number(r?.count) || 0);
+      })
+      .catch(() => {
+        setItems([]);
+        setCount(0);
+        setError(true);
+      })
+      .finally(() => setLoading(false));
+  }, [params, reload]);
 
   const setFilter = (k, v) => setFilters((f) => ({ ...f, [k]: v === ANY ? undefined : v }));
   const clearAll = () => {
@@ -169,12 +194,12 @@ export default function Convocatorias() {
               </SheetHeader>
               {opts ? (
                 <div className="space-y-6 pb-24">
-                  <FSel label="Estado" value={filters.status} onChange={(v) => setFilter("status", v)} options={opts.statuses} />
-                  <FSel label="País" value={filters.country} onChange={(v) => setFilter("country", v)} options={opts.countries} />
-                  <FSel label="Tipo" value={filters.type} onChange={(v) => setFilter("type", v)} options={opts.types} />
-                  <FSel label="Área" value={filters.area} onChange={(v) => setFilter("area", v)} options={opts.areas} />
-                  <FSel label="Tipo de proponente" value={filters.proponent} onChange={(v) => setFilter("proponent", v)} options={opts.proponents} />
-                  <FSel label="Modalidad" value={filters.modalidad} onChange={(v) => setFilter("modalidad", v)} options={opts.modalidades} />
+                  <FSel label="Estado" value={filters.status} onChange={(v) => setFilter("status", v)} options={filterOpts.statuses} />
+                  <FSel label="País" value={filters.country} onChange={(v) => setFilter("country", v)} options={filterOpts.countries} />
+                  <FSel label="Tipo" value={filters.type} onChange={(v) => setFilter("type", v)} options={filterOpts.types} />
+                  <FSel label="Área" value={filters.area} onChange={(v) => setFilter("area", v)} options={filterOpts.areas} />
+                  <FSel label="Tipo de proponente" value={filters.proponent} onChange={(v) => setFilter("proponent", v)} options={filterOpts.proponents} />
+                  <FSel label="Modalidad" value={filters.modalidad} onChange={(v) => setFilter("modalidad", v)} options={filterOpts.modalidades} />
                   <div>
                     <div className="font-mono-meta text-obsidian/50 mb-2">Rango de monto</div>
                     <div className="grid grid-cols-2 gap-2">
@@ -263,7 +288,19 @@ export default function Convocatorias() {
         ) : null}
 
         {/* Main grid */}
-        {loading && items.length === 0 ? (
+        {error && items.length === 0 ? (
+          <div className="border border-terracotta/20 bg-white p-14 text-center rounded-md max-w-2xl mx-auto">
+            <div className="font-serif-display text-4xl italic text-terracotta mb-3">
+              No pudimos cargar las convocatorias
+            </div>
+            <p className="text-obsidian/60 mb-6">
+              El servidor no respondió. Revisa la conexión e inténtalo de nuevo.
+            </p>
+            <Button onClick={() => setReload((n) => n + 1)} className="rounded-full bg-obsidian text-alabaster hover:bg-obsidian/90 h-10 px-6">
+              Reintentar
+            </Button>
+          </div>
+        ) : loading && items.length === 0 ? (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
             {Array.from({ length: 6 }).map((_, i) => <SkeletonCard key={i} />)}
           </div>
@@ -297,7 +334,7 @@ function FSel({ label, value, onChange, options }) {
         </SelectTrigger>
         <SelectContent>
           <SelectItem value={ANY}>Todos</SelectItem>
-          {options.map((o) => <SelectItem key={o} value={o}>{o}</SelectItem>)}
+          {(options || []).map((o) => <SelectItem key={o} value={o}>{o}</SelectItem>)}
         </SelectContent>
       </Select>
     </div>

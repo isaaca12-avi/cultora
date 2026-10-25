@@ -267,7 +267,7 @@ def build_admin_router(db, get_current_user) -> APIRouter:
             raise HTTPException(409, "Ya existe una cuenta con ese email")
         await _log(user, "user.created", "user", doc["id"],
                    {"role": role_key, "email": email})
-        safe_user = {k: v for k, v in doc.items() if k != "password_hash"}
+        safe_user = {k: v for k, v in doc.items() if k not in {"password_hash", "_id"}}
         return {"ok": True, "user": safe_user, "temporary_password": temp_password}
 
     @router.get("/users/{uid}")

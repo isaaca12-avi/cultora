@@ -6,10 +6,32 @@ import { CaretLeft } from "@phosphor-icons/react";
 export default function KnowledgeDoc() {
   const { docId } = useParams();
   const [doc, setDoc] = useState(null);
+  const [notFound, setNotFound] = useState(false);
 
   useEffect(() => {
-    knowledge.get(docId).then(setDoc);
+    let alive = true;
+    setNotFound(false);
+    knowledge.get(docId)
+      .then((d) => {
+        if (!alive) return;
+        if (!d || typeof d !== "object") setNotFound(true);
+        else setDoc(d);
+      })
+      .catch(() => { if (alive) setNotFound(true); });
+    return () => { alive = false; };
   }, [docId]);
+
+  if (notFound) {
+    return (
+      <div className="mx-auto max-w-lg border border-obsidian/10 bg-white p-12 text-center rounded-md">
+        <div className="font-serif-display text-3xl italic text-terracotta mb-3">Documento no encontrado</div>
+        <p className="text-obsidian/60 mb-6">Puede que ya no esté disponible en la biblioteca.</p>
+        <Link to="/conocimiento" className="text-sm font-medium text-obsidian underline underline-offset-4 hover:text-terracotta">
+          Volver a la biblioteca
+        </Link>
+      </div>
+    );
+  }
 
   if (!doc) return <div className="font-serif-display text-2xl text-obsidian/50">Cargando…</div>;
 
@@ -38,7 +60,7 @@ export default function KnowledgeDoc() {
 }
 
 function MarkdownLite({ content }) {
-  const blocks = content.split(/\n\n+/);
+  const blocks = String(content || "").split(/\n\n+/);
   return (
     <div className="space-y-5">
       {blocks.map((b, i) => {

@@ -3,6 +3,7 @@ import "@/App.css";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/lib/auth-context";
 import { Toaster } from "@/components/ui/sonner";
+import ErrorBoundary from "@/components/ErrorBoundary";
 
 import AppLayout from "@/components/AppLayout";
 import Landing from "@/pages/Landing";
@@ -78,63 +79,65 @@ export default function App() {
     <div className="App noise-overlay">
       <AuthProvider>
         <BrowserRouter>
-          <Routes>
-            <Route path="/" element={<Landing />} />
-            <Route path="/vision" element={<Vision />} />
-            <Route path="/apoyar" element={<Support />} />
-            <Route path="/convocatorias" element={<AppLayout />}>
-              <Route index element={<Convocatorias />} />
-            </Route>
-            <Route path="/convocatorias/:convId" element={<AppLayout />}>
-              <Route index element={<ConvocatoriaDetail />} />
-            </Route>
-            <Route path="/login" element={<PublicOnly><LoginPage /></PublicOnly>} />
-            <Route path="/registro" element={<PublicOnly><RegisterPage /></PublicOnly>} />
-            <Route path="/recuperar-password" element={<RecuperarPassword />} />
-            <Route path="/restablecer-password" element={<RestablecerPassword />} />
-            <Route path="/verificar-email" element={<VerifyEmail />} />
-            <Route path="/cambiar-password-inicial" element={<InitialPasswordChange />} />
+          <ErrorBoundary>
+            <Routes>
+              <Route path="/" element={<Landing />} />
+              <Route path="/vision" element={<Vision />} />
+              <Route path="/apoyar" element={<Support />} />
+              <Route path="/convocatorias" element={<AppLayout />}>
+                <Route index element={<Convocatorias />} />
+              </Route>
+              <Route path="/convocatorias/:convId" element={<AppLayout />}>
+                <Route index element={<ConvocatoriaDetail />} />
+              </Route>
+              <Route path="/login" element={<PublicOnly><LoginPage /></PublicOnly>} />
+              <Route path="/registro" element={<PublicOnly><RegisterPage /></PublicOnly>} />
+              <Route path="/recuperar-password" element={<RecuperarPassword />} />
+              <Route path="/restablecer-password" element={<RestablecerPassword />} />
+              <Route path="/verificar-email" element={<VerifyEmail />} />
+              <Route path="/cambiar-password-inicial" element={<InitialPasswordChange />} />
 
-            <Route element={<Protected><AppLayout /></Protected>}>
-              <Route path="/dashboard" element={<Dashboard />} />
-              <Route path="/perfil" element={<ProfilePage />} />
-              <Route path="/objetivos" element={<GoalsPage />} />
-              <Route path="/diagnostico/:sessionId" element={<Diagnostic />} />
-              <Route path="/planes" element={<PlansList />} />
-              <Route path="/plan/:planId" element={<PlanView />} />
-              <Route path="/conocimiento" element={<Knowledge />} />
-              <Route path="/conocimiento/:docId" element={<KnowledgeDoc />} />
-              <Route path="/agentes" element={<AgentsList />} />
-              <Route path="/agentes/mi-perfil" element={<MyAgentProfile />} />
-              <Route path="/agentes/:agentId" element={<AgentProfile />} />
-              <Route path="/foro" element={<ForumHome />} />
-              <Route path="/foro/nuevo" element={<ForumNew />} />
-              <Route path="/foro/tema/:topicId" element={<ForumTopic />} />
-            </Route>
+              <Route element={<Protected><AppLayout /></Protected>}>
+                <Route path="/dashboard" element={<Dashboard />} />
+                <Route path="/perfil" element={<ProfilePage />} />
+                <Route path="/objetivos" element={<GoalsPage />} />
+                <Route path="/diagnostico/:sessionId" element={<Diagnostic />} />
+                <Route path="/planes" element={<PlansList />} />
+                <Route path="/plan/:planId" element={<PlanView />} />
+                <Route path="/conocimiento" element={<Knowledge />} />
+                <Route path="/conocimiento/:docId" element={<KnowledgeDoc />} />
+                <Route path="/agentes" element={<AgentsList />} />
+                <Route path="/agentes/mi-perfil" element={<MyAgentProfile />} />
+                <Route path="/agentes/:agentId" element={<AgentProfile />} />
+                <Route path="/foro" element={<ForumHome />} />
+                <Route path="/foro/nuevo" element={<ForumNew />} />
+                <Route path="/foro/tema/:topicId" element={<ForumTopic />} />
+              </Route>
 
-            <Route path="/admin" element={<AdminLayout />}>
-              <Route index element={<AdminDashboard />} />
-              <Route path="usuarios" element={<AdminUsers />} />
-              <Route path="agentes" element={<AdminAgents />} />
-              <Route path="foro" element={<AdminForum />} />
-              <Route path="convocatorias" element={<AdminConvocatorias />} />
-              <Route path="recursos" element={<AdminResources />} />
-              <Route path="espacios" element={<AdminSpaces />} />
-              <Route path="analiticas" element={<AdminAnalytics />} />
-              <Route path="configuracion" element={<AdminConfig />} />
-              <Route path="configuracion/roles" element={<AdminRoles />} />
-              <Route path="motor" element={<AdminMotorHub />} />
-              <Route path="motor/biblioteca" element={<AdminMotorBiblioteca />} />
-              <Route path="motor/reglas" element={<AdminMotorReglas />} />
-              <Route path="motor/simulador" element={<AdminMotorSimulador />} />
-              <Route path="perfil" element={<AdminProfile />} />
-              <Route path="actividad" element={<AdminActivity />} />
-            </Route>
+              <Route path="/admin" element={<AdminLayout />}>
+                <Route index element={<AdminDashboard />} />
+                <Route path="usuarios" element={<AdminUsers />} />
+                <Route path="agentes" element={<AdminAgents />} />
+                <Route path="foro" element={<AdminForum />} />
+                <Route path="convocatorias" element={<AdminConvocatorias />} />
+                <Route path="recursos" element={<AdminResources />} />
+                <Route path="espacios" element={<AdminSpaces />} />
+                <Route path="analiticas" element={<AdminAnalytics />} />
+                <Route path="configuracion" element={<AdminConfig />} />
+                <Route path="configuracion/roles" element={<AdminRoles />} />
+                <Route path="motor" element={<AdminMotorHub />} />
+                <Route path="motor/biblioteca" element={<AdminMotorBiblioteca />} />
+                <Route path="motor/reglas" element={<AdminMotorReglas />} />
+                <Route path="motor/simulador" element={<AdminMotorSimulador />} />
+                <Route path="perfil" element={<AdminProfile />} />
+                <Route path="actividad" element={<AdminActivity />} />
+              </Route>
 
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+            <Toaster position="bottom-right" richColors />
+          </ErrorBoundary>
         </BrowserRouter>
-        <Toaster position="bottom-right" richColors />
       </AuthProvider>
     </div>
   );

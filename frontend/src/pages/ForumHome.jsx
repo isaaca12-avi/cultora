@@ -43,8 +43,8 @@ export default function ForumHome() {
   const [sort, setSort] = useState("recent");
 
   useEffect(() => {
-    forumApi.meta().then(setMeta);
-    forumApi.list({ featured: true, limit: 3 }).then((r) => setFeatured(r.items || [])).catch(() => {});
+    forumApi.meta().then((m) => setMeta(m && typeof m === "object" ? m : null)).catch(() => setMeta(null));
+    forumApi.list({ featured: true, limit: 3 }).then((r) => setFeatured(Array.isArray(r?.items) ? r.items : [])).catch(() => {});
   }, []);
 
   const params = useMemo(() => {
@@ -56,7 +56,9 @@ export default function ForumHome() {
   }, [category, kind, q, sort]);
 
   useEffect(() => {
-    forumApi.list(params).then((r) => setItems(r.items));
+    forumApi.list(params)
+      .then((r) => setItems(Array.isArray(r?.items) ? r.items : []))
+      .catch(() => setItems([]));
   }, [params]);
 
   const hasActiveFilters = Boolean(category) || Boolean(kind) || Boolean(q);

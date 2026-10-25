@@ -1,7 +1,38 @@
 import axios from "axios";
+import { toast } from "sonner";
 
-const BASE = process.env.REACT_APP_BACKEND_URL;
+const rawBase = (process.env.REACT_APP_BACKEND_URL || "").trim();
+const fallbackBase = process.env.NODE_ENV === "development" ? "http://localhost:8001" : "";
+const BASE = rawBase && rawBase !== "undefined" ? rawBase.replace(/\/+$/, "") : fallbackBase;
 export const API = `${BASE}/api`;
+
+let lastUnavailableAt = 0;
+function notifyUnavailable() {
+  const now = Date.now();
+  if (now - lastUnavailableAt < 15000) return;
+  lastUnavailableAt = now;
+  toast.error("No pudimos conectar con el servidor. Inténtalo de nuevo en unos minutos.");
+}
+
+function isHtmlPayload(data) {
+  return typeof data === "string" && /^\s*<(?:!doctype|html)/i.test(data.slice(0, 200));
+}
+
+function backendUnavailable() {
+  const err = new Error("El servidor del API no está disponible.");
+  err.isBackendUnavailable = true;
+  err.response = {
+    status: 0,
+    data: {
+      detail: "No pudimos conectar con el servidor. Inténtalo de nuevo en unos minutos.",
+    },
+  };
+  if (process.env.NODE_ENV === "development") {
+    console.warn("[Cultora] Respuesta no JSON del API. Revisa REACT_APP_BACKEND_URL y el backend.");
+  }
+  notifyUnavailable();
+  return err;
+}
 
 export const http = axios.create({ baseURL: API });
 
@@ -17,6 +48,10 @@ http.interceptors.request.use((cfg) => {
 // - account_blocked / account_suspended → logout local + redirect a /login con motivo.
 http.interceptors.response.use(
   (r) => {
+    // Si el servidor devolvió HTML (p. ej. el fallback SPA), no es una respuesta de API válida.
+    if (isHtmlPayload(r?.data)) {
+      return Promise.reject(backendUnavailable());
+    }
     // Rotación de token: si el backend devolvió un token nuevo en la respuesta, reemplaza el local.
     try {
       const t = r?.data?.token;
@@ -28,6 +63,7 @@ http.interceptors.response.use(
   },
   (err) => {
     try {
+      if (!err?.response) notifyUnavailable();
       const status = err?.response?.status;
       const detail = err?.response?.data?.detail;
       const code = typeof detail === "object" ? detail?.code : null;
@@ -47,6 +83,17 @@ http.interceptors.response.use(
         if (path !== "/login") {
           window.location.replace(`/login?reason=${code}`);
         }
+      }
+      // Los componentes muestran el detalle directamente; evita objetos/arrays como hijos de React.
+      if (detail && typeof detail === "object" && !Array.isArray(detail) && err?.response?.data) {
+        if (typeof detail.message === "string" && detail.message.trim()) {
+          err.response.data.detail = detail.message;
+        } else if (err.response.data.detail === detail) {
+          err.response.data.detail = "No se pudo completar la operación.";
+        }
+      } else if (Array.isArray(detail) && err?.response?.data) {
+        const first = detail.find((d) => typeof d?.msg === "string");
+        err.response.data.detail = first?.msg || "Revisa los datos e inténtalo de nuevo.";
       }
     } catch (_) {}
     return Promise.reject(err);
