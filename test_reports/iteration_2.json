@@ -1,0 +1,28 @@
+{
+  "summary": "E2E validation of the new Agents directory feature (Cultora). Backend: 17/17 pytest cases pass (list, filters catalog, search q, city filter, AND-multi-capabilities filter, availability+role combined, detail with auth, detail 404, save, save idempotent, saved reflected in detail, saved list, unsave, save non-existent 404, save requires auth). Frontend: /agentes renders 30 cards, search 'teatro' debounces to 3 results, 'Limpiar' restores 30, capability chip 'Docencia' filters to 12 with active visual state, agent profile shows all sections (descripción, contacto, capacidades, intereses, ofrece, necesita, proyectos, acciones), Save toggles and persists across reload. Editorial tone preserved (no social-network feel).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_agents.py",
+    "/app/test_reports/pytest/pytest_agents_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "server.py route order for /api/agents/saved MUST stay declared BEFORE /api/agents/{agent_id} — currently correct. If someone reorders later, /agents/saved will 401/404 due to auth on the detail route treating 'saved' as an agent_id. Add a code comment or move both under a nested sub-router to make the ordering explicit and safe.",
+    "AgentsList.jsx: on initial mount, agentsApi.saved() is called unauthenticated-safe path? Actually it requires auth (backend). If a logged-out user hits /agentes, that call will 401 and the promise rejects silently (no .catch). /agentes route is behind Private wrapper so this is OK, but consider a .catch to avoid unhandled promise console noise.",
+    "AgentProfile.jsx uses window.location.href = mailto: for Contactar; this is fine for email links, but consider a plain <a href='mailto:...'> to avoid a full page reload behavior on some browsers.",
+    "AgentsList AgentCard: capabilities.slice(0,3) shows first 3 in seed order; consider showing user-highlighted or most-filtered caps first for better relevance when a capability filter is active.",
+    "Backend list_agents accepts capabilities/interests as CSV; if a value contains a comma (none in seed), it will split incorrectly. Consider allowing repeated query params (capabilities=X&capabilities=Y) via FastAPI List[str] instead of CSV — future-proof.",
+    "Backend get_agent_detail requires auth, so a logged-out user viewing /agentes/:id will get 401 and the UI shows 'Cargando…' indefinitely (only a toast fires on error). Add a redirect-to-login on 401, or make detail public with a 'saved' field only when authenticated."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_agents.py"
+  ],
+  "success_rate": {"backend": "100% (17/17)", "frontend": "100% (all critical flows OK)"},
+  "test_credentials": "maria@example.com / cultora123 (existing) used for UI login. New backend tests self-register a TEST_ user per run.",
+  "seed_data_creation": "None (30 agents come from static /app/backend/agents_seed.py).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend tests live in /app/backend/tests/test_agents.py; run with `python -m pytest backend/tests/test_agents.py -v -o addopts=''`. The existing pytest.ini uses xdist by default so pass `-o addopts=''` to disable, or add `-p no:xdist`. Test uses REACT_APP_BACKEND_URL from env or frontend/.env fallback. Agents endpoints: GET /api/agents (public), GET /api/agents/filters (public), GET /api/agents/{id} (auth), POST/DELETE /api/agents/{id}/save (auth), GET /api/agents/saved (auth). Route order: /agents/saved MUST be declared before /agents/{agent_id} in server.py.",
+  "rca of the issue": "N/A — no bugs found in this feature. All 13 acceptance criteria pass."
+}

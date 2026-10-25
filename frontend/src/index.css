@@ -1,0 +1,458 @@
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500;600;700&family=Manrope:wght@300;400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+    margin: 0;
+    font-family: 'Manrope', system-ui, -apple-system, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    background: #F9F8F6;
+    color: #0F0F0F;
+}
+
+code {
+    font-family: 'IBM Plex Mono', monospace;
+}
+
+@layer base {
+    :root {
+        --background: 42 25% 97%;
+        --foreground: 0 0% 6%;
+        --card: 0 0% 100%;
+        --card-foreground: 0 0% 6%;
+        --popover: 0 0% 100%;
+        --popover-foreground: 0 0% 6%;
+        --primary: 0 0% 6%;
+        --primary-foreground: 42 25% 97%;
+        --secondary: 39 15% 90%;
+        --secondary-foreground: 0 0% 6%;
+        --muted: 39 12% 93%;
+        --muted-foreground: 0 0% 42%;
+        --accent: 39 15% 90%;
+        --accent-foreground: 0 0% 6%;
+        --destructive: 12 68% 43%;
+        --destructive-foreground: 0 0% 100%;
+        --border: 0 0% 6% / 0.12;
+        --input: 0 0% 6% / 0.14;
+        --ring: 12 68% 43%;
+        --chart-1: 12 68% 43%;
+        --chart-2: 96 15% 24%;
+        --chart-3: 39 20% 55%;
+        --chart-4: 0 0% 6%;
+        --chart-5: 0 0% 55%;
+        --radius: 0.375rem;
+
+        /* Cultora tokens */
+        --alabaster: #F9F8F6;
+        --obsidian: #0F0F0F;
+        --terracotta: #B64626;
+        --olive: #3A4533;
+        --linen: #EAE7E0;
+    }
+}
+
+@layer base {
+    * {
+        border-color: rgba(15, 15, 15, 0.12);
+    }
+    body {
+        background-color: var(--alabaster);
+        color: var(--obsidian);
+    }
+    ::selection {
+        background: var(--terracotta);
+        color: var(--alabaster);
+    }
+}
+
+/* Editorial serif utility */
+.font-serif-display {
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    font-weight: 400;
+    letter-spacing: -0.02em;
+    line-height: 1;
+}
+.font-mono-meta {
+    font-family: 'IBM Plex Mono', monospace;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    font-size: 0.72rem;
+}
+
+/* Noise overlay for depth */
+.noise-overlay::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+    opacity: 0.04;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix type='saturate' values='0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+}
+
+/* Editorial ribbon question */
+.ribbon-question {
+    border-left: 2px solid var(--terracotta);
+    padding-left: 1.75rem;
+}
+
+/* Micro animations */
+.lift {
+    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+.lift:hover {
+    transform: translateY(-2px);
+}
+
+/* Nav link */
+.nav-link {
+    position: relative;
+    transition: color 0.2s ease;
+}
+.nav-link::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    bottom: -4px;
+    height: 1px;
+    width: 100%;
+    background: var(--obsidian);
+    transform: scaleX(0);
+    transform-origin: right;
+    transition: transform 0.25s ease;
+}
+.nav-link:hover::after,
+.nav-link.active::after {
+    transform: scaleX(1);
+    transform-origin: left;
+}
+
+/* Editorial divider */
+.rule-divider {
+    height: 1px;
+    background: rgba(15, 15, 15, 0.14);
+}
+
+.grid-frame {
+    border: 1px solid rgba(15, 15, 15, 0.12);
+    background: #FFFFFF;
+}
+
+/* Prevent centered app root */
+.App {
+    text-align: left;
+    min-height: 100vh;
+    background: var(--alabaster);
+    position: relative;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: var(--alabaster); }
+::-webkit-scrollbar-thumb { background: rgba(15,15,15,0.18); border-radius: 999px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(15,15,15,0.35); }
+
+@media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; animation: none !important; }
+}
+
+/* ================================================================
+   ADMIN PANEL — Sistema de temas independiente (Linear/Vercel-like)
+   Se activa con [data-admin-theme="light|dark"] en <html>.
+   Usa variables CSS aisladas del app principal (--a-*).
+   ================================================================ */
+:root[data-admin-theme="light"] {
+    --a-bg: #FAFAFA;
+    --a-surface: #FFFFFF;
+    --a-surface-2: #F5F5F5;
+    --a-surface-hover: #F0F0F0;
+    --a-border: rgba(15, 15, 15, 0.08);
+    --a-border-strong: rgba(15, 15, 15, 0.14);
+    --a-text: #0A0A0A;
+    --a-text-muted: rgba(15, 15, 15, 0.62);
+    --a-text-faint: rgba(15, 15, 15, 0.38);
+    --a-accent: #B64626;
+    --a-accent-fg: #FFFFFF;
+    --a-success: #17693B;
+    --a-warn: #B07800;
+    --a-danger: #B23A2C;
+    --a-focus: rgba(182, 70, 38, 0.35);
+    --a-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
+    --a-shadow: 0 1px 3px rgba(0, 0, 0, 0.05), 0 6px 20px rgba(0, 0, 0, 0.04);
+    --a-shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.10);
+}
+
+:root[data-admin-theme="dark"] {
+    --a-bg: #0A0A0A;
+    --a-surface: #111111;
+    --a-surface-2: #161616;
+    --a-surface-hover: #1B1B1B;
+    --a-border: rgba(255, 255, 255, 0.08);
+    --a-border-strong: rgba(255, 255, 255, 0.14);
+    --a-text: #F5F5F5;
+    --a-text-muted: rgba(245, 245, 245, 0.62);
+    --a-text-faint: rgba(245, 245, 245, 0.38);
+    --a-accent: #E56A47;
+    --a-accent-fg: #0A0A0A;
+    --a-success: #4ADE80;
+    --a-warn: #F5C542;
+    --a-danger: #F87070;
+    --a-focus: rgba(229, 106, 71, 0.40);
+    --a-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+    --a-shadow: 0 1px 3px rgba(0, 0, 0, 0.5), 0 8px 24px rgba(0, 0, 0, 0.35);
+    --a-shadow-lg: 0 12px 40px rgba(0, 0, 0, 0.55);
+}
+
+/* Aplicar el fondo del admin cuando el atributo esté presente */
+:root[data-admin-theme] body {
+    background: var(--a-bg) !important;
+    color: var(--a-text);
+}
+:root[data-admin-theme] .App {
+    background: var(--a-bg) !important;
+}
+:root[data-admin-theme] .noise-overlay::before {
+    opacity: 0;
+}
+
+/* Utilidades admin */
+.admin-surface { background: var(--a-surface); border: 1px solid var(--a-border); border-radius: 10px; }
+.admin-surface-flat { background: var(--a-surface); border: 1px solid var(--a-border); }
+.admin-text-muted { color: var(--a-text-muted); }
+.admin-text-faint { color: var(--a-text-faint); }
+.admin-border { border-color: var(--a-border) !important; }
+.admin-border-strong { border-color: var(--a-border-strong) !important; }
+
+/* Enfocable base para admin */
+.admin-focus:focus-visible {
+    outline: 2px solid var(--a-focus);
+    outline-offset: 2px;
+    border-radius: 8px;
+}
+
+/* Botón admin (Linear/Vercel style) */
+.admin-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    height: 34px;
+    padding: 0 12px;
+    border: 1px solid var(--a-border-strong);
+    background: var(--a-surface);
+    color: var(--a-text);
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 500;
+    letter-spacing: -0.01em;
+    transition: background-color .15s ease, border-color .15s ease, transform .1s ease;
+    cursor: pointer;
+    white-space: nowrap;
+}
+.admin-btn:hover { background: var(--a-surface-hover); }
+.admin-btn:active { transform: translateY(1px); }
+.admin-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.admin-btn-primary {
+    background: var(--a-text);
+    color: var(--a-bg);
+    border-color: var(--a-text);
+}
+.admin-btn-primary:hover { background: var(--a-text); opacity: 0.9; }
+.admin-btn-accent {
+    background: var(--a-accent);
+    color: var(--a-accent-fg);
+    border-color: var(--a-accent);
+}
+.admin-btn-accent:hover { opacity: 0.92; background: var(--a-accent); }
+.admin-btn-danger {
+    color: var(--a-danger);
+    border-color: var(--a-border-strong);
+    background: transparent;
+}
+.admin-btn-danger:hover { background: var(--a-danger); color: white; border-color: var(--a-danger); }
+.admin-btn-ghost { background: transparent; border-color: transparent; }
+.admin-btn-ghost:hover { background: var(--a-surface-hover); }
+.admin-btn-icon {
+    width: 34px; height: 34px; padding: 0; justify-content: center;
+}
+
+/* Input admin */
+.admin-input, .admin-textarea, .admin-select {
+    display: block;
+    width: 100%;
+    height: 36px;
+    padding: 0 12px;
+    background: var(--a-surface);
+    color: var(--a-text);
+    border: 1px solid var(--a-border-strong);
+    border-radius: 8px;
+    font-size: 13.5px;
+    transition: border-color .15s ease, box-shadow .15s ease;
+    font-family: inherit;
+}
+.admin-textarea { height: auto; padding: 10px 12px; min-height: 84px; resize: vertical; }
+/* Tailwind width utilities must override the default 100% */
+.admin-input.w-64, .admin-input.w-56, .admin-input.w-48, .admin-input.w-44,
+.admin-input.w-40, .admin-input.w-32, .admin-input.w-24 { width: revert; }
+.admin-select.w-64, .admin-select.w-56, .admin-select.w-48, .admin-select.w-44,
+.admin-select.w-40, .admin-select.w-32 { width: revert; }
+.admin-input:focus, .admin-textarea:focus, .admin-select:focus {
+    outline: none;
+    border-color: var(--a-accent);
+    box-shadow: 0 0 0 3px var(--a-focus);
+}
+.admin-input::placeholder, .admin-textarea::placeholder { color: var(--a-text-faint); }
+
+/* Chip / badge admin */
+.admin-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    border: 1px solid var(--a-border-strong);
+    background: var(--a-surface);
+    color: var(--a-text-muted);
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+    line-height: 1.6;
+}
+.admin-chip-solid { background: var(--a-surface-2); }
+.admin-chip-success { color: var(--a-success); border-color: color-mix(in oklab, var(--a-success) 30%, transparent); }
+.admin-chip-warn { color: var(--a-warn); border-color: color-mix(in oklab, var(--a-warn) 30%, transparent); }
+.admin-chip-danger { color: var(--a-danger); border-color: color-mix(in oklab, var(--a-danger) 30%, transparent); }
+.admin-chip-accent { color: var(--a-accent); border-color: color-mix(in oklab, var(--a-accent) 30%, transparent); }
+
+/* Card admin */
+.admin-card {
+    background: var(--a-surface);
+    border: 1px solid var(--a-border);
+    border-radius: 12px;
+    box-shadow: var(--a-shadow-sm);
+    transition: box-shadow .18s ease, border-color .18s ease;
+}
+.admin-card:hover { box-shadow: var(--a-shadow); }
+
+/* Sidebar item */
+.admin-sb-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 7px 10px;
+    border-radius: 7px;
+    color: var(--a-text-muted);
+    font-size: 13.5px;
+    letter-spacing: -0.01em;
+    transition: background-color .15s ease, color .15s ease;
+    cursor: pointer;
+    text-decoration: none;
+    position: relative;
+}
+.admin-sb-item:hover { background: var(--a-surface-hover); color: var(--a-text); }
+.admin-sb-item.active {
+    background: var(--a-surface-2);
+    color: var(--a-text);
+    font-weight: 500;
+}
+.admin-sb-item.active::before {
+    content: "";
+    position: absolute;
+    left: -8px;
+    top: 8px; bottom: 8px;
+    width: 2px;
+    background: var(--a-accent);
+    border-radius: 2px;
+}
+
+/* Table admin */
+.admin-table { width: 100%; border-collapse: collapse; }
+.admin-table th {
+    text-align: left;
+    font-weight: 500;
+    font-size: 11.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--a-text-faint);
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--a-border);
+    background: var(--a-surface);
+    position: sticky;
+    top: 0;
+    z-index: 1;
+}
+.admin-table td {
+    padding: 12px 12px;
+    border-bottom: 1px solid var(--a-border);
+    font-size: 13.5px;
+    color: var(--a-text);
+    vertical-align: middle;
+}
+.admin-table tbody tr { transition: background-color .12s ease; }
+.admin-table tbody tr:hover { background: var(--a-surface-hover); }
+.admin-table tbody tr:last-child td { border-bottom: 0; }
+
+/* Kbd */
+.admin-kbd {
+    display: inline-flex;
+    padding: 1px 6px;
+    background: var(--a-surface-2);
+    border: 1px solid var(--a-border-strong);
+    border-bottom-width: 2px;
+    border-radius: 4px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10.5px;
+    color: var(--a-text-muted);
+}
+
+/* Skeleton */
+.admin-skel {
+    background: linear-gradient(90deg, var(--a-surface-2) 0%, var(--a-surface-hover) 50%, var(--a-surface-2) 100%);
+    background-size: 200% 100%;
+    animation: admin-shimmer 1.6s ease-in-out infinite;
+    border-radius: 6px;
+}
+@keyframes admin-shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+
+/* Fade-in animation for admin views */
+.admin-fadein { animation: admin-fadein .28s ease both; }
+@keyframes admin-fadein {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* Ensure admin scrollbar matches theme */
+:root[data-admin-theme] ::-webkit-scrollbar-track { background: var(--a-bg); }
+:root[data-admin-theme] ::-webkit-scrollbar-thumb { background: var(--a-border-strong); }
+:root[data-admin-theme="dark"] ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.14); }
+
+/* Chip / tag */
+.chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.25rem 0.6rem;
+    border: 1px solid rgba(15, 15, 15, 0.14);
+    border-radius: 999px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.68rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    background: #FFFFFF;
+    color: var(--obsidian);
+}
+
+/* Debug wrapper (preserve platform behavior) */
+@layer base {
+    [data-debug-wrapper="true"] { display: contents !important; }
+    [data-debug-wrapper="true"] > * {
+        margin-left: inherit; margin-right: inherit; margin-top: inherit; margin-bottom: inherit;
+        padding-left: inherit; padding-right: inherit; padding-top: inherit; padding-bottom: inherit;
+        column-gap: inherit; row-gap: inherit; gap: inherit;
+        border-left-width: inherit; border-right-width: inherit; border-top-width: inherit; border-bottom-width: inherit;
+        border-left-style: inherit; border-right-style: inherit; border-top-style: inherit; border-bottom-style: inherit;
+        border-left-color: inherit; border-right-color: inherit; border-top-color: inherit; border-bottom-color: inherit;
+    }
+}

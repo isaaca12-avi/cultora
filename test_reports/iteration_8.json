@@ -1,0 +1,37 @@
+{
+  "summary": "End-to-end validation of iteration 8 (Motor status widget + Admin profile password change). Backend: 7/7 pytest tests PASS in /app/backend/tests/test_admin_motor_status_and_password.py — GET /api/admin/motor/status returns 200 for superadmin with the full { health:{score:0-100,label,tone}, kb:{documents_total,documents_published,documents_authoritative,chunks_indexed,...}, rules:{by_goal:[{goal_key,goal_title,active,...}]}, activity:{simulations_7d,...}, alerts:[] } structure and score in [0,100] (observed 85 in current env); returns 403 for maria@example.com (no admin_role, blocked by _engine_motor_perms perm intersection); returns 401 unauth; POST /api/admin/me/change-password returns 400 'La contraseña actual es incorrecta' when current is wrong, 422 when new_password<8 (pydantic Field(min_length=8)), 400 'La nueva contraseña debe ser distinta' when new==current, and full round-trip works (cultora-admin-2026 -> TempPass2026! -> login with new works, old rejected 401, revert -> original login works again). Frontend Playwright: 14/14 checkpoints PASS — admin@cultora.net login redirects to /admin, AdminDashboard renders admin-motor-status-widget with motor-widget-health (score '85 Excelente 85/100'), motor-widget-docs, motor-widget-rules, motor-widget-sims; motor-widget-open navigates to /admin/motor; admin-user-menu -> admin-menu-profile opens /admin/perfil; change-password-form renders with submit disabled initially, enables after filling input-current-password + input-new-password (>=8) + input-confirm-password (matching); submit shows toast 'Contraseña actualizada correctamente' and change-password-success panel appears; second submit reverts password to cultora-admin-2026 (verified via full logout + login).",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_admin_motor_status_and_password.py",
+    "/app/test_reports/pytest/pytest_iter8.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "admin_router.py — /motor/status uses `Depends(get_current_user)` + manual perm intersection instead of `Depends(_require())`. Works correctly but inconsistent with rest of the router (which uses _require + specific perms). Consider `Depends(_require())` for the 'any admin' pattern; the current perm-set check is fine but bypasses the 'status==blocked' check that _require enforces. A blocked admin whose role still grants engine.* could still call this endpoint.",
+    "admin_router.change_own_password — imports bcrypt inside the function body (`import bcrypt as _bcrypt`). Minor: prefer module-level import for consistency and to avoid per-request import cost, though Python caches it.",
+    "admin_router.change_own_password — uses `Depends(_require())` which requires admin_role. This intentionally excludes non-admin users; if the feature is later extended to public users, needs generalization. Acceptable for current spec (admin profile only).",
+    "AdminProfile.jsx — password strength meter uses only `strength >= 1` implicitly (never blocks weak passwords). Consider warning UI if strength < 2, though not a blocker.",
+    "AdminMotorStatusWidget.jsx — no retry / stale-time. If the widget errors once (e.g. brief 5xx) it stays in the error state until page refresh. Consider a manual retry button or React-Query with retry."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_admin_motor_status_and_password.py (new)"
+  ],
+  "success_rate": {
+    "backend": "100% (7/7)",
+    "frontend": "100% (14/14 checkpoints)"
+  },
+  "test_credentials": "Admin: admin@cultora.net / cultora-admin-2026 (VERIFIED still working after roundtrip). Non-admin: maria@example.com / cultora123 (verified 403 on /motor/status).",
+  "seed_data_creation": "None permanent. Admin password was temporarily changed to TempPass2026! and reverted back to cultora-admin-2026 both in backend pytest and in frontend Playwright flow (each flow does its own change+revert cycle).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Iteration 8 (motor status widget on AdminDashboard + /admin/perfil password change) fully validated. To re-run backend tests: `cd /app && REACT_APP_BACKEND_URL=<url> python -m pytest backend/tests/test_admin_motor_status_and_password.py -v -o addopts=''`. The full_roundtrip test changes admin password to TempPass2026! and reverts — if it aborts midway the account may be left on TempPass2026! (in that case log in with TempPass2026! and change back via /admin/perfil, or via `curl POST /api/admin/me/change-password`). Login page uses data-testids `auth-email-input`, `auth-password-input`, `auth-submit-login` (from constants/testIds/cultora.js), NOT the `login-*-input` names in constants/testIds/auth.js (those are unused by the current Login.jsx which imports AUTH from cultora.js). Both the motor status widget and change-password form use every requested data-testid.",
+  "rca of the issue": "No bugs found. All acceptance criteria in the review request were met on first run."
+}

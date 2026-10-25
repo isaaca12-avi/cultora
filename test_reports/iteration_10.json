@@ -1,0 +1,47 @@
+{
+  "summary": "Validated end-to-end gating of must_change_password + POST /api/auth/change-initial-password on backend (via public URL) and the full frontend flow (/login → /cambiar-password-inicial → /admin). Backend: 15/15 pytest tests passed. Frontend: E2E happy path passed (redirect, form fill, submit, success toast, redirect to admin). No password leaks in logs or responses.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "InitialPasswordChange",
+        "issue": "Calls nav('/login') and nav('/admin' or '/dashboard') SYNCHRONOUSLY inside the render body (lines 26-34) when user is null or !must_change_password. This triggers the React warning 'Cannot update a component while rendering a different component' in the console. Wrap those redirect side-effects in a useEffect (or use <Navigate replace/>) to avoid setState-in-render.",
+        "selector": "InitialPasswordChange.jsx lines 26-34",
+        "priority": "MEDIUM"
+      }
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_must_change_password_gating.py",
+    "/app/test_reports/pytest/pytest_gating_results.xml"
+  ],
+  "action_items": [
+    "Wrap the redirect logic inside InitialPasswordChange.jsx in a useEffect (or return <Navigate to=... replace />) to eliminate the 'Cannot update a component while rendering a different component' React warning. Functionality currently works but the warning pollutes the console and can hide real issues."
+  ],
+  "critical_code_review_comments": [
+    "server.py::get_current_user gate correctly returns 403 with dict detail {code: password_change_required, message: ...} — matches spec.",
+    "change_initial_password: response only returns {ok, changed_at}, never the password or hash — verified via test_10.",
+    "logger.info('password.initial_changed user_id=%s', ...) — logs only user_id, no password ever appears in backend logs — verified with grep on /var/log/supervisor/backend.*.log.",
+    "admin_bootstrap.py never logs password; result dict contains only status/email/user_id — validated by existing pytest suite (14/14) + new suite (15/15).",
+    "InitialPasswordChange.jsx: calling navigate() during render is a React anti-pattern that produces the warning captured in tests. Should be moved to useEffect."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_must_change_password_gating.py (new)",
+    "/app/backend/tests/_seed_ui_test_user.py (new helper — safe to keep or remove)"
+  ],
+  "success_rate": {
+    "backend": "100% (15/15 pytest tests)",
+    "frontend": "100% (login → change-password redirect → form submit → admin redirect all worked; only warning is the React setState-in-render notice)"
+  },
+  "test_credentials": "Tests create their own users (bootstrap-test-{timestamp}@cultora.io, bootstrap-ui-test-{timestamp}@cultora.io) with temp password 'InitialTemp!2026X' and rotate to 'NuevaPassRobusta!99' / 'NuevaPassUI!2026Z'. Cleanup deletes them at teardown. admin@cultora.net and maria@example.com were NOT touched (verified post-run).",
+  "seed_data_creation": "Test user seeded directly in Mongo via motor with bcrypt hash + must_change_password=true + admin_role=superadmin, then deleted in fixture teardown. UI test user was cleaned via inline script.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Backend gating and change-initial-password endpoint are fully validated end-to-end at /app/backend/tests/test_must_change_password_gating.py. Reuse this file — it self-cleans its test users. The only pending item is a MEDIUM-priority React anti-pattern warning in InitialPasswordChange.jsx (nav() in render body).",
+  "rca_of_the_issue": "N/A — no functional bugs found. The frontend console warning ('Cannot update a component while rendering a different component' — BrowserRouter/InitialPasswordChange) is caused by calling react-router's nav() during render. Fix: replace `if (!user) { nav('/login', {replace:true}); return null; }` with `if (!user) return <Navigate to='/login' replace />;` (already imported/used elsewhere in App.js). Same for the must_change_password=false branch."
+}

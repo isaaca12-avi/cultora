@@ -1,0 +1,132 @@
+{
+  "theme": "light",
+  "typography": {
+    "headings": {
+      "family": "Cormorant Garamond, serif",
+      "weights": ["300", "400", "600"],
+      "usage": "H1, H2, H3, and major editorial blocks. Always use tracking-tight."
+    },
+    "body": {
+      "family": "Manrope, sans-serif",
+      "weights": ["400", "500", "600"],
+      "usage": "Paragraphs, labels, UI elements, dashboard data."
+    },
+    "mono": {
+      "family": "IBM Plex Mono, monospace",
+      "weights": ["400"],
+      "usage": "Tags, status indicators, tiny metadata, overlines (uppercase + wide tracking)."
+    },
+    "scale": {
+      "h1": "text-4xl sm:text-5xl lg:text-6xl tracking-tight leading-none",
+      "h2": "text-2xl sm:text-3xl lg:text-4xl tracking-tight",
+      "h3": "text-xl sm:text-2xl",
+      "body": "text-base leading-relaxed",
+      "small": "text-sm text-muted-foreground",
+      "overline": "text-xs tracking-[0.2em] uppercase font-mono"
+    }
+  },
+  "colors": {
+    "archetype": "Organic & Earthy + Swiss Museum (Editorial)",
+    "palette": {
+      "background": "#F9F8F6",
+      "foreground": "#0F0F0F",
+      "card": "#FFFFFF",
+      "card_foreground": "#0F0F0F",
+      "primary": "#0F0F0F",
+      "primary_foreground": "#F9F8F6",
+      "secondary": "#EAE7E0",
+      "secondary_foreground": "#0F0F0F",
+      "accent_terracotta": "#B64626",
+      "accent_olive": "#3A4533",
+      "muted": "#EFEFEF",
+      "muted_foreground": "#6B6B6B",
+      "border": "rgba(15, 15, 15, 0.12)"
+    },
+    "rules": [
+      "Never use pure black or white. Backgrounds are Alabaster/Museum White (#F9F8F6) and text is Pitch Black (#0F0F0F).",
+      "Avoid standard SaaS gradients. Use flat, solid colors with a tactile feel.",
+      "Primary actions should use the dark obsidian color, while decorative or success states can use the terracotta or olive accents.",
+      "Limit the use of primary color strictly to the most critical CTAs."
+    ]
+  },
+  "visual_enhancers": {
+    "surfaces": "Use 'Neumorphism (Tactile Variant)' mixed with 'Grid Borders'. Flat solid backgrounds for cards with a crisp 1px border-black/10 and subtle shadow (shadow-sm). Never use muddy glassmorphism in the main reading areas.",
+    "borders": "Expose the skeleton in dashboard views. Use border-r border-b for grid items to give a 'Technical/Editorial' structure.",
+    "textures": "Incorporate a very subtle SVG noise overlay fixed in the background with opacity-5 to kill the digital flatness.",
+    "icons": "Use @phosphor-icons/react (Duotone or Light weight) for an elegant, high-end feel."
+  },
+  "component_name": {
+    "consultant_chat": "Do not build generic chat bubbles. Build 'Editorial Ribbons'. The AI's questions should look like large H2 headers. User inputs should be clean, large textarea or elegant form inputs below it.",
+    "action_plan_blocks": "Use Shadcn Cards heavily customized to look like an executive brief. No rounded corners larger than 'rounded-md'. Use grid columns for 'Situación Actual', 'Causas', 'Prioridades', etc.",
+    "kanban_dashboard": "Cardless approach for the columns. Use thin lines to separate columns. Tasks are rectangular flat blocks with mono-spaced tags.",
+    "buttons": "Pill-shaped or sharp rectangles. hover:-translate-y-0.5 transition-transform duration-200. Text must contrast strictly."
+  },
+  "grids": {
+    "landing": "MODE A: 'Tetris' Grid. md:grid-cols-12 gap-8 to gap-12. Asymmetrical layout. Lots of negative space.",
+    "dashboard": "MODE B: High Density Grid. grid-cols-1 md:grid-cols-4. gap-6. Strict hierarchy."
+  },
+  "layouts": {
+    "spacing": "Generous Spacing Philosophy. Use p-8, p-12, py-24. Containers with borders must have internal padding (p-8).",
+    "alignment": "Paragraphs left-aligned. Main question ('¿Qué quieres lograr?') left-aligned or optically centered if serving as a massive hero text.",
+    "navigation": "Solid background (bg-[#F9F8F6]) with 1px border-b. No transparent headers. Clear logo + 3-5 links + Primary CTA.",
+    "dashboard_layout": "Sidebar navigation (border-r) + main content area. Strict, objective, and functional."
+  },
+  "motion": {
+    "transitions": "Use specific properties. transition: transform 0.2s ease, opacity 0.2s ease. NO 'transition: all'.",
+    "entrance": "Staggered fade-ins and slight vertical lifts for dashboard data and action plan blocks (framer-motion or simple CSS keyframes).",
+    "interactions": "Hover states must lift the element slightly and adjust border/shadow. Focus states must have high contrast rings."
+  },
+  "accessibility": {
+    "contrast": "Strict adherence to minimum 4.5:1 for text. Hover states must explicitly set text color.",
+    "focus": "focus:ring-2 focus:ring-primary focus:outline-none focus:ring-offset-2",
+    "motion": "Respect prefers-reduced-motion.",
+    "testing": "All interactive elements MUST include data-testid (e.g., data-testid='goal-input', data-testid='submit-goal-button')."
+  },
+  "media": {
+    "rules": "Images must not exceed 80vh on mobile. Images should have a subtle dark overlay (bg-black/10) to blend into the editorial design if text is placed on them.",
+    "image_urls": [
+      {
+        "url": "https://images.pexels.com/photos/3778138/pexels-photo-3778138.jpeg",
+        "category": "Hero / Landing Background",
+        "description": "Artist in studio. Represents the target audience (creatives) in their natural environment."
+      },
+      {
+        "url": "https://images.pexels.com/photos/4538272/pexels-photo-4538272.jpeg",
+        "category": "Dashboard / Knowledge Base Header",
+        "description": "Contemporary art gallery interior. Evokes the museum/gallery strategic aesthetic."
+      },
+      {
+        "url": "https://images.pexels.com/photos/27584011/pexels-photo-27584011.jpeg",
+        "category": "About / Mission Section",
+        "description": "Art gallery hallway. Represents the destination/success for cultural projects."
+      }
+    ]
+  },
+  "3d_libraries": {
+    "recommendation": "Not highly recommended for this specific 'sober, accessible, reliable' consultancy UI. Keep the focus heavily on typography and editorial flow."
+  },
+  "instructions_to_main_agent": [
+    "Install required fonts from Google Fonts: Cormorant Garamond, Manrope, IBM Plex Mono.",
+    "Install Phosphor Icons: yarn add @phosphor-icons/react",
+    "Install Framer Motion: yarn add framer-motion",
+    "Override default Shadcn configurations to match the custom colors (Alabaster base, Obsidian text).",
+    "Do NOT build generic chat interfaces (user right, bot left bubbles). The interaction should feel like filling an interactive canvas or brief.",
+    "Ensure the hero question '¿Qué quieres lograr?' uses the h1 serif typography and feels deeply personal and authoritative.",
+    "Use standard `.js` files for components since TypeScript is not enforced. Ensure components are modular.",
+    "Dashboard should be flat, without excessive card dropshadows. Rely on grid borders and crisp padding.",
+    "All text must be in Spanish."
+  ],
+  "UNIVERSAL GUIDELINES FOR MAIN AGENT": [
+    "You tend to converge toward generic, 'on distribution' outputs. Avoid 'AI slop' aesthetics. Make it distinct.",
+    "DO NOT use dark colors as gradients. Use solid colors.",
+    "Do not make generic centered layouts. Use asymmetrical or heavily left-aligned grids.",
+    "Create depth through layered design elements and border hierarchies.",
+    "MUST NOT apply universal transition (transition: all).",
+    "MUST NOT center align the app container (.App { text-align: center; }).",
+    "NEVER use AI assistant Emoji characters like 🤖🧠💭💡🔮🎯. Use Phosphor icons instead.",
+    "Every interaction needs micro-animations - hover states, transitions.",
+    "Use 2-3x more spacing than feels comfortable.",
+    "Use sonner for toasts. Do NOT use HTML-based components for advanced interactions.",
+    "DO NOT use complete transparent background in header, overlays, any surface that has content under it."
+  ]
+}

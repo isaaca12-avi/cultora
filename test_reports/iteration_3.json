@@ -1,0 +1,23 @@
+{
+  "summary": "Frontend-only bug-fix verification for landing-return navigation. All three return-to-landing points verified working: (1) 'Volver a la página principal' back link on /agentes navigates to '/', (2) 'Cultora' sidebar logo (nav-logo-link) navigates to '/' from /dashboard, /planes, /conocimiento, and (3) authenticated user visiting '/' correctly sees the public landing with hero '¿Qué quieres lograr con tu proyecto?' without being redirected. Landing also correctly shows Agentes section with 4 cards + photos, and 'Ingresar' header link goes to /login.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Route '/' is not wrapped in any guard, which is correct for this bug fix. However, note there is no explicit landing-vs-dashboard preference for authenticated users; if product ever wants auto-redirect for authenticated visitors, revisit App.js line 43.",
+    "AppLayout.jsx uses the same data-testid 'nav-logo-link' on both desktop (line 32) and mobile (line 86) Link nodes. Duplicate testids may cause .first() ambiguity in future tests; consider suffixing '-desktop'/'-mobile'."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (skipped)", "frontend": "100%"},
+  "test_credentials": "maria@example.com / cultora123 (from /app/memory/test_credentials.md)",
+  "seed_data_creation": "None",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Verified navigation URLs by asserting page.url and href attributes after clicks. Hero text uses split DOM nodes ('lograr' in <em>), so use h1.innerText (which returns joined text) or check for headings array rather than substring match on page.content(). Landing headings observed: ['¿Qué quieres\\nlograr con tu proyecto?', 'Empieza donde te duele.', 'Agentes culturales', 'Tu proyecto merece consultoría estratégica...']. 4 randomuser.me portrait images render on Agentes section of landing.",
+  "rca of the issue": "N/A — this iteration verified an already-implemented bug fix. Root cause of original bug was that the app previously lacked '/' → landing route for authenticated users and did not have a persistent 'back to landing' link inside app shell. Fix: (a) App.js '/' now renders <Landing/> without PublicOnly guard, (b) AgentsList.jsx back link now `to='/'`, (c) AppLayout.jsx sidebar & mobile logos now `to='/'`. All three fixes verified end-to-end."
+}

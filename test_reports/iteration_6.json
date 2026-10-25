@@ -1,0 +1,32 @@
+{
+  "summary": "End-to-end validation of iteration 6 (Notifications module). Backend: 12/12 pytest cases PASS in /app/backend/tests/test_notifications.py — GET /admin/notifications returns {count,unread,items[]} with all expected schema fields (id, kind, title, subtitle, url, required_perm, target_type, target_id, created_at, read_by, dismissed_by, is_read), users.recent_registrations auto-generated at startup and confirmed present for maria, unread_only=true filter returns only is_read=false items, /admin/notifications/unread-count matches list.unread, POST /{nid}/read marks is_read=true and decrements unread by 1, POST /{nid}/dismiss removes notification from user's next list, POST /mark-all-read marks all visible unread as read and returns {ok, modified} (unread → 0 afterwards), no-admin user gets 403, content_editor user only sees notifications whose required_perm ∈ their permissions (never users.view), convocatoria.expiring auto-created for a POST /admin/convocatorias with close_date +3d & status Abierta (verified after 60s TTL cache expiry), and idempotency confirmed — multiple GET calls don't duplicate (kind,target_type,target_id) tuples. Frontend Playwright: login as maria, /admin loads, data-testid=admin-notifications-bell present in header, data-testid=admin-notifications-badge shows '2' (unread count), clicking bell opens data-testid=admin-notifications-popover with header 'Notificaciones', both tabs notif-tab-all and notif-tab-unread render, admin-notifications-list container with 2 notif items (notif-item-{id}), each item has hover dismiss button (notif-dismiss-{id}), notif-mark-all-read button visible while unreads exist, clicking it → badge disappears and unread tab shows 'Sin notificaciones' empty state, tab switching works instantly, click on notification navigates to /admin/usuarios and closes popover automatically, dismiss button removes item from list, dark mode renders popover with bg rgb(17,17,17) + light text (good contrast).",
+  "backend_issues": { "critical": [], "minor": [] },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_notifications.py",
+    "/app/test_reports/pytest/pytest_notifications_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "notifications.notify(): when target_type and target_id are both None, idempotency uses (kind, subtitle, last-24h) which relies on stable subtitle string; if a source ever changes wording it could re-fire — acceptable for now but worth documenting.",
+    "notifications.refresh_notifications(): _LAST_REFRESH is a module-global dict, not per-user; fine since 'global' is the only key used, but the type hint Dict[str, datetime] is a bit misleading — could rename to _LAST_REFRESH_AT.",
+    "admin_router.list_notifications(): the refresh_notifications(db) call is awaited on EVERY /admin/notifications request (guarded by TTL 60s). Under high frontend polling (45s interval per open tab × N admins) it will re-scan sources ~every request-that-crosses-60s. Consider running refresh as a background task instead of inline await to avoid latency spikes when TTL just expired.",
+    "admin_router.mark_notification_read/dismiss: return 404 if user's required_perm doesn't match — good — but the query `required_perm: {$in: list(_user_perms(user))}` will also 404 for a notification that exists but is out of scope; the error message 'Notificación no encontrada' is slightly misleading for a permission mismatch (would be nice to distinguish 403 vs 404).",
+    "NotificationsBell.jsx: dismiss button has class opacity-0 group-hover:opacity-100 — works visually but is always focusable via keyboard (accessibility could be improved with aria-hidden until hover/focus).",
+    "NotificationsBell.jsx polling of 45s per mounted instance — if the admin opens multiple admin tabs, load fires per-tab. Not critical but visible on network panel."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_notifications.py (new)"
+  ],
+  "success_rate": { "backend": "100% (12/12)", "frontend": "100% (13/13 checks)" },
+  "test_credentials": "Superadmin: maria@example.com / cultora123. Probe users registered fresh per test with test_notif_*_*@example.com emails.",
+  "seed_data_creation": "Tests created ~8 probe users (test_notif_seed, read, dismiss, markall, noadmin, editor, search cleanup handled by unset role at end). 1 test convocatoria was created ('TEST Convocatoria expiring ...' with close_date +3d, Abierta) and archived in module teardown. Frontend testing marked maria's initial 2 unread notifs as read + dismissed one — she now sees 1 read notif in 'Todas' tab, empty state in 'No leídas'.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Notifications module validated. Backend tests in /app/backend/tests/test_notifications.py — run with `REACT_APP_BACKEND_URL=<url> python -m pytest backend/tests/test_notifications.py -v -o addopts=''`. IMPORTANT: The convocatoria.expiring test may take up to 62s due to _LAST_REFRESH TTL (module-global cache in notifications.py). If you want to force-refresh in a test, call `await refresh_notifications(db, force=True)` from Python or restart backend. All notifs are filtered by required_perm ∈ user_permissions AND dismissed_by ∉ [user]. Test data left in DB: several TEST users, 1 archived TEST convocatoria, and the auto-generated notifications (never deleted globally). Frontend testids: admin-notifications-bell, admin-notifications-badge, admin-notifications-popover, admin-notifications-list, notif-tab-all, notif-tab-unread, notif-item-{id}, notif-dismiss-{id}, notif-mark-all-read.",
+  "rca of the issue": "N/A — all iteration 6 features working as specified."
+}

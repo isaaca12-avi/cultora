@@ -1,0 +1,42 @@
+{
+  "summary": "End-to-end testing of Cultora Admin Panel (backend + frontend). 25/25 backend pytest cases passed (admin/me, dashboard, users list, RBAC role changes + moderator 403 + superadmin self-protection, status change + self-suspend guard, convocatorias CRUD + status + duplicate, resources CRUD with soft-delete, spaces CRUD with soft-delete, config get/put, activity log, analytics). 11/11 frontend Playwright checks passed (unauth /admin -> /login redirect, Maria login -> /admin loads dashboard + sidebar, 10 sidebar sections visible + all navigate to correct page ids, theme toggle flips data-admin-theme light<->dark, users search+apply shows Maria as Superadmin, 'Nueva convocatoria' Sheet creates row visible in table, user menu shows logout, logout invalidates session and further /admin -> /login, freshly registered user visits /admin -> admin-restricted screen).",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Convocatoria Sheet (Nueva/Editar)", "issues": ["Radix Dialog warning: 'Missing Description or aria-describedby' for SheetContent — non-blocking accessibility warning, not a functional bug. Add <SheetDescription> or aria-describedby to silence and improve a11y."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_admin.py",
+    "/app/test_reports/pytest/pytest_admin_results.xml"
+  ],
+  "action_items": [
+    "Optional a11y polish: provide SheetDescription/aria-describedby on Sheet(Content) in AdminConvocatorias.jsx (and any other admin Sheets) to remove Radix runtime warnings."
+  ],
+  "critical_code_review_comments": [
+    "backend/tests/test_admin.py runs against public REACT_APP_BACKEND_URL — no default is set to avoid silent misconfiguration (fails fast if env missing).",
+    "admin_router.py `PUT /users/{uid}/role`: guard message says 'No puedes quitarte tu propio rol de superadmin' but check `body.role != 'superadmin'` runs even when body.role is None. This is correct behavior (any non-superadmin change to own row is blocked), but the message wording implies only superadmin↔? transitions; consider clarifying to 'No puedes cambiar tu propio rol' to match `/status` endpoint.",
+    "admin_router.py `admin_list_conv` performs Mongo writes (auto-close overdue Abierta) inside a GET request loop — this is a side effect that also runs for read-only roles (moderator w/ convocatorias.view). Acceptable given global data, but consider moving into a background/cron task.",
+    "AdminSidebar data-testid pattern `admin-nav--admin-usuarios` yields a double-dash after 'nav-' (because the path already starts with `/`). Works but visually confusing; consider trimming leading slash before replacement.",
+    "admin_router.list_users includes {password_hash: 0} projection — good. Also verify no other endpoint leaks password_hash (dashboard/agents already do).",
+    "admin_router.set_user_status does NOT prevent superadmin blocking another superadmin — intentional per RBAC, but worth product review."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_admin.py (new)"
+  ],
+  "success_rate": {
+    "backend": "100% (25/25)",
+    "frontend": "100% (11/11 checks)"
+  },
+  "test_credentials": "Superadmin: maria@example.com / cultora123 (from /app/memory/test_credentials.md). New probe users are registered per-run with unique emails.",
+  "seed_data_creation": "During backend tests: (a) created one probe user (test_probe_*@example.com) — promoted to moderator then role reverted to None at end. (b) 1 convocatoria + 1 duplicate '(copia)' remain in DB. (c) 1 resource created then soft-deleted, 1 space created then soft-deleted. (d) config.disciplines was temporarily overwritten to ['TEST1','TEST2'] and then restored to original 7 values via curl. Frontend test additionally created 1 restricted-only user (test_restricted_*@example.com) and 1 convocatoria titled 'TEST UI Conv <ts>' via the Sheet — both are non-destructive and safe.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Admin backend endpoints live under /api/admin/*. Frontend testids for admin panel: admin-dashboard, admin-sidebar, admin-nav--admin-{seccion} (note the double-dash), admin-theme-toggle (togles html[data-admin-theme]), admin-users-search + admin-users-apply, admin-conv-new + admin-conv-save (inside Sheet), admin-user-menu + admin-logout, admin-restricted. Login testids: auth-email-input, auth-password-input, auth-submit-login, auth-name-input, auth-submit-register. Superadmin: maria@example.com / cultora123. Any freshly registered user has NO admin role and will see AdminRestricted on /admin.",
+  "rca of the issue": "N/A — all functionality tested is working as specified."
+}

@@ -1,0 +1,27 @@
+{
+  "summary": "Frontend regression testing for the admin-vs-public-user isolation fix. All 3 code changes (Protected wrapper redirect for admins, AdminSidebar 'Ver sitio público' link with target=_blank, AdminHeader dropdown item with window.open) verified end-to-end via Playwright against the public URL. Admin never sees the common-user Dashboard anymore, and common users are unaffected.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": ["/app/test_reports/iteration_9.json"],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Protected wrapper in /app/frontend/src/App.js correctly guards user-only routes; admin redirect via Navigate to='/admin' works for /dashboard, /perfil, /planes, /objetivos, /diagnostico/:sessionId, /agentes/mi-perfil.",
+    "AdminSidebar 'Ver sitio público' item renders as an <a href='/' target='_blank' rel='noopener noreferrer'> — behaves exactly as required; no internal navigation to /dashboard.",
+    "AdminHeader dropdown item 'admin-menu-view-site' opens a popup at / (verified via page.expect_popup); 'admin-menu-profile' navigates to /admin/perfil.",
+    "Common-user path unaffected: maria@example.com login lands on /dashboard and all user routes (/dashboard, /perfil, /agentes, /foro, /convocatorias, /planes) remain accessible.",
+    "Reverse protection (common user hitting /admin) still shows the 'Acceso restringido' AdminRestricted screen.",
+    "Non-blocking console warnings observed in /perfil: shadcn Select component switching between controlled/uncontrolled (repeats multiple times). Not a regression from this fix, but worth cleaning up (initialize value with '' or defined default in ProfilePage)."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (frontend-only run)", "frontend": "100%"},
+  "test_credentials": "admin@cultora.net / cultora-admin-2026 (superadmin); maria@example.com / cultora123 (common user)",
+  "seed_data_creation": "None — used existing seeded accounts.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Fix is verified working. Verified flows: (1) admin login -> /admin, (2) admin direct-URL to /dashboard,/perfil,/planes,/objetivos,/diagnostico/:id,/agentes/mi-perfil all redirect to /admin and AdminDashboard renders (admin-motor-status-widget visible), (3) AdminSidebar 'Ver sitio público' is an <a target=_blank href=/> with data-testid='admin-sidebar-view-site', (4) AdminHeader dropdown item data-testid='admin-menu-view-site' triggers window.open('/','_blank') — confirmed popup opened landing page; data-testid='admin-menu-profile' navigates to /admin/perfil, (5) common user maria@example.com can still access /dashboard,/perfil,/agentes,/foro,/convocatorias,/planes, (6) common user visiting /admin gets 'Acceso restringido'. No regressions detected.",
+  "rca of the issue": "Root cause of the original bug: the Protected wrapper let admins render user-only pages (Dashboard, Profile, etc.) because it only gated on `!user`. Additionally the AdminSidebar/AdminHeader had a 'Ir a la plataforma' entry that performed internal navigation to /dashboard, taking admins into the public product UI. Fix: (a) Protected now short-circuits with <Navigate to='/admin'/> when user.is_admin || user.admin_role, (b) the sidebar/header items were renamed 'Ver sitio público' and were changed to open '/' in a new tab (target=_blank / window.open). Verified end-to-end — issue no longer reproduces."
+}
