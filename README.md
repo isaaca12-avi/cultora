@@ -247,7 +247,7 @@ Notas:
 | `NODE_VERSION` | `20` |
 | `YARN_VERSION` | `1.22.22` |
 
-3. Crea `frontend/public/_redirects` para que las rutas de React Router funcionen al recargar:
+3. El repositorio ya incluye `frontend/public/_redirects` para que las rutas de React Router funcionen al recargar. Si falta, créalo con:
 
 ```text
 /*    /index.html   200
